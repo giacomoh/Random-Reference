@@ -6,3 +6,8 @@ If you apply multiple filters at once they might break, clicking reset will retu
 I tried a bunch of other programs like this, but there were always features that i didn't like. 
 I AM NOT A PROGRAMMER, this is held together by duct tape and broken dreams, and the code is at least 60% written by the github AI assistant.
 If you'd like to add features or help me fix something you can make a PR! 
+
+                            ╱|、
+                          (˚ˎ 。7  
+                           |、˜〵          
+                           じしˍ,)ノ
