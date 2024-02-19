@@ -42,7 +42,8 @@ just download the latest python version, then open your CMD and >pip install X (
 
 # To do
 - Skip an image if the path was already previously picked
-
+- smoother image movement (lags slightly on larger files)
+- Open multiple folders
 
                             ╱|、
                           (˚ˎ 。7  
