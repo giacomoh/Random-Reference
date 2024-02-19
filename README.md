@@ -16,7 +16,6 @@ It's just a python script so i'm not converting it into an EXE, just click on it
 
 I tried a bunch of other programs like this, but there were always features that i didn't like. 
 I AM NOT A PROGRAMMER, this is held together by duct tape and broken dreams, and the code is at least 60% written by the github AI assistant.
-If you'd like to add features or help me fix something you can make a PR! 
 
 Here are they python requirements to run:
 
@@ -44,7 +43,7 @@ just download the latest python version, then open your CMD and >pip install X (
 - smoother image movement (lags slightly on larger files)
 - ???
 
-If you have any features you'd like to add you can message me or open a pull request!
+If you have any features you'd like to see added you can message me or open a pull request!
 
                             ╱|、
                           (˚ˎ 。7  
