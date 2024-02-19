@@ -20,12 +20,19 @@ If you'd like to add features or help me fix something you can make a PR!
 
 Here are they python requirements to run:
 customtkinter == 5.2.2
+
 darkdetect    == 0.8.0
+
 numpy         == 1.26.4
+
 opencv-python == 4.9.0.80
+
 packaging     == 23.2
+
 pillow        == 10.2.0
+
 pipdeptree    == 2.14.0
+
 scipy         == 1.12.0
 
 You won't need to CMD install them if you use the EXE file.
