@@ -1,3 +1,5 @@
+get thereleases here: https://github.com/giacomoh/reference-picker/releases
+
 # screenshorts
 ![image](https://github.com/giacomoh/reference-picker/assets/53836108/9769aee9-902e-4d34-9455-32408ab68fdd)
 
