@@ -21,7 +21,6 @@ class ImageViewer:
         self.pan_y = 0
         self.flipped_horizontal = False
         self.bind_mouse_events()
-        self.original_image = None
         self.is_grayscale = False
         self.image_history = []  # History of selected images
         self.history_position = -1  # Current position in the history
@@ -43,6 +42,7 @@ class ImageViewer:
         self.last_wheel_event_time = 0
         self.last_move_event_time = 0
         self.selected_folder = self.load_folder_path()  # Load the last selected folder path
+        self.bind_events()
         if self.selected_folder:
             # Get the list of image filenames
             self.image_filenames = os.listdir(self.selected_folder)
@@ -54,12 +54,12 @@ class ImageViewer:
             self.image_filenames = []  # Initialize image_filenames to an empty list if no folder is selected
 
     
-        if self.selected_folder:
-            self.pick_image()  # Automatically pick an image if a folder is already selected
-            self.bind_mouse_events()
-            if self.canvas:
-                self.canvas.bind("<MouseWheel>", self.on_mouse_wheel)
 
+    def bind_events(self):
+        if self.canvas:
+            self.bind_mouse_events()
+            self.canvas.bind("<MouseWheel>", self.on_mouse_wheel)
+            
     def load_folder_path(self):
         if os.path.exists('last_opened_folder.txt'):
             with open('last_opened_folder.txt', 'r') as f:
@@ -97,12 +97,17 @@ class ImageViewer:
             if self.selected_folder:
                 if not self.image_filenames:  # If all images have been picked
                     # Reload the list of image filenames
-                    self.image_filenames = os.listdir(self.selected_folder)
-                # Pick a random image and remove it from the list
-                image_filename = self.image_filenames.pop(random.randint(0, len(self.image_filenames) - 1))
+                    self.image_filenames = [os.path.join(dp, f) for dp, dn, filenames in os.walk(self.selected_folder) for f in filenames if f.endswith(('.png', '.jpg', '.jpeg', '.bmp', '.svg', '.webp'))]
+                # Pick a random image
+                image_filename = random.choice(self.image_filenames)
+                # Check if it's a file before opening it
+                while not os.path.isfile(image_filename):
+                    self.image_filenames.remove(image_filename)
+                    image_filename = random.choice(self.image_filenames)
+                # Remove the selected image from the list
+                self.image_filenames.remove(image_filename)
                 print("Selected image:", image_filename)
-                file_path = os.path.join(self.selected_folder, image_filename)
-                self.current_image = Image.open(file_path)
+                self.current_image = Image.open(image_filename)
                 self.current_photo = ImageTk.PhotoImage(self.current_image)
                 self.display_image()
                 self.reset_pan()
@@ -112,7 +117,7 @@ class ImageViewer:
                 self.canvas.bind("<MouseWheel>", self.on_mouse_wheel)
 
                 # Add the selected image to the history and update the history position
-                self.image_history.append(file_path)
+                self.image_history.append(image_filename)
                 self.history_position += 1
                 print(self.history_position)
 
@@ -126,6 +131,7 @@ class ImageViewer:
             print("An error occurred:", e)
         self.original_image = self.current_image
         self.is_grayscale = False
+        self.bind_events()
 
     def go_back(self):
         if self.history_position > 0:
@@ -149,9 +155,11 @@ class ImageViewer:
 
         else:
             print("No previous image.")
+        self.bind_events()
+
     def on_move_press(self, event):
         current_time = time.time()
-        if current_time - self.last_move_event_time < 0.05:  # Adjust the throttle rate as needed
+        if current_time - self.last_move_event_time < 0.1:  # Adjust the throttle rate as needed
             return
         self.last_move_event_time = current_time
 
@@ -213,7 +221,7 @@ class ImageViewer:
 
     def on_mouse_wheel(self, event):
         current_time = time.time()
-        if current_time - self.last_wheel_event_time < 0.05:  # Adjust the throttle rate as needed
+        if current_time - self.last_wheel_event_time < 0.1:  # Adjust the throttle rate as needed
             return
         self.last_wheel_event_time = current_time
         oldscale = self.scale_factor
@@ -248,7 +256,6 @@ class ImageViewer:
              # Reset the image to the original image before any rotation
             self.current_image = self.original_image
             self.original_rotation = 0  # Reset the rotation
-            self.current_image = self.original_image
             self.current_photo = ImageTk.PhotoImage(self.current_image)
             self.display_image()
             self.reset_pan()
@@ -511,9 +518,6 @@ s_time_entry = create_time_entry(button_frame2, 0, 4)
 
 start_timer_button = create_button_with_grid(button_frame2, "Start", viewer.start_timer, 0, 5)
 stopresume_timer_button = create_button_with_grid(button_frame2, "Stop/resume", viewer.toggle_timer, 0, 1)
-toggle_ui_button = create_button_with_grid(button_frame2, "UI", viewer.toggle_ui, 0, 6)
-
-# Toggle UI button
 toggle_ui_button = create_button_with_grid(button_frame2, "UI", viewer.toggle_ui, 0, 6)
 
 # canvas
