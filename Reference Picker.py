@@ -40,6 +40,18 @@ class ImageViewer:
         self.median_filter_button = None  # Initialize the median filter button
         self.posterize_button = None  # Initialize the posterize button
         self.grayscale_button = None  # Initialize the grayscale button
+        self.last_wheel_event_time = 0
+        self.last_move_event_time = 0
+        self.selected_folder = self.load_folder_path()  # Load the last selected folder path
+        if self.selected_folder:
+            # Get the list of image filenames
+            self.image_filenames = os.listdir(self.selected_folder)
+            self.pick_image()  # Automatically pick an image if a folder is already selected
+            self.bind_mouse_events()
+            if self.canvas:
+                self.canvas.bind("<MouseWheel>", self.on_mouse_wheel)
+        else:
+            self.image_filenames = []  # Initialize image_filenames to an empty list if no folder is selected
 
     
         if self.selected_folder:
@@ -77,11 +89,17 @@ class ImageViewer:
             self.selected_folder = folder_path
             self.save_folder_path(folder_path)  # Save the selected folder path
             print("Selected folder:", folder_path)
+            # Get the list of image filenames
+            self.image_filenames = [os.path.join(dp, f) for dp, dn, filenames in os.walk(self.selected_folder) for f in filenames if f.endswith(('.png', '.jpg', '.jpeg', '.bmp', '.svg', '.webp'))]
 
     def pick_image(self):
         try:
             if self.selected_folder:
-                image_filename = random.choice(os.listdir(self.selected_folder))
+                if not self.image_filenames:  # If all images have been picked
+                    # Reload the list of image filenames
+                    self.image_filenames = os.listdir(self.selected_folder)
+                # Pick a random image and remove it from the list
+                image_filename = self.image_filenames.pop(random.randint(0, len(self.image_filenames) - 1))
                 print("Selected image:", image_filename)
                 file_path = os.path.join(self.selected_folder, image_filename)
                 self.current_image = Image.open(file_path)
@@ -132,6 +150,11 @@ class ImageViewer:
         else:
             print("No previous image.")
     def on_move_press(self, event):
+        current_time = time.time()
+        if current_time - self.last_move_event_time < 0.05:  # Adjust the throttle rate as needed
+            return
+        self.last_move_event_time = current_time
+
         dx = event.x - self.prev_x
         dy = event.y - self.prev_y
         self.prev_x = event.x
@@ -189,6 +212,10 @@ class ImageViewer:
         self.prev_y = event.y
 
     def on_mouse_wheel(self, event):
+        current_time = time.time()
+        if current_time - self.last_wheel_event_time < 0.05:  # Adjust the throttle rate as needed
+            return
+        self.last_wheel_event_time = current_time
         oldscale = self.scale_factor
         self.scale_factor += event.delta / 1200.0
         if self.scale_factor < 0.1:
