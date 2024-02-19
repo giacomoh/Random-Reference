@@ -41,9 +41,10 @@ But if you don't want to install and run it, you can use the python script.
 just download the latest python version, then open your CMD and >pip install X (where X is pillow, customtkinter, tkinter, etc)
 
 # To do
-- Skip an image if the path was already previously picked
 - smoother image movement (lags slightly on larger files)
-- Open multiple folders
+- ???
+
+If you have any features you'd like to add you can message me or open a pull request!
 
                             ╱|、
                           (˚ˎ 。7  
