@@ -1,3 +1,10 @@
+# screenshorts
+![image](https://github.com/giacomoh/reference-picker/assets/53836108/9769aee9-902e-4d34-9455-32408ab68fdd)
+
+![image](https://github.com/giacomoh/reference-picker/assets/53836108/9952a0b5-bf5b-4e16-b11f-051814702e11)
+
+# info
+
 Hi, this is a program for selecting and displaying images.
 It will ask you to select a folder the first time, after that it will create txt file to remember the last folder you picked (in the same folder you put the file in).
 You can rotate, fip, zoom move around add a couple of filters, etc
