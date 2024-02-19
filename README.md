@@ -37,6 +37,10 @@ scipy         == 1.12.0
 
 You won't need to CMD install them if you use the EXE file.
 
+# To do
+- Skip an image if the path was already previously picked
+
+
                             ╱|、
                           (˚ˎ 。7  
                            |、˜〵          
