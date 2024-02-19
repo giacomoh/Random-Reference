@@ -19,6 +19,9 @@ I AM NOT A PROGRAMMER, this is held together by duct tape and broken dreams, and
 If you'd like to add features or help me fix something you can make a PR! 
 
 Here are they python requirements to run:
+
+tkinter
+
 customtkinter == 5.2.2
 
 darkdetect    == 0.8.0
@@ -31,11 +34,11 @@ packaging     == 23.2
 
 pillow        == 10.2.0
 
-pipdeptree    == 2.14.0
-
 scipy         == 1.12.0
 
 You won't need to CMD install them if you use the EXE file.
+But if you don't want to install and run it, you can use the python script.
+just download the latest python version, then open your CMD and >pip install X (where X is pillow, customtkinter, tkinter, etc)
 
 # To do
 - Skip an image if the path was already previously picked
