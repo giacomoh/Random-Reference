@@ -17,7 +17,7 @@ It's just a python script so i'm not converting it into an EXE, just click on it
 I tried a bunch of other programs like this, but there were always features that i didn't like. 
 I AM NOT A PROGRAMMER, this is held together by duct tape and broken dreams, and the code is at least 60% written by the github AI assistant.
 
-Here are they python requirements to run:
+Here are the python requirements to run:
 
 tkinter
 
@@ -28,8 +28,6 @@ darkdetect    == 0.8.0
 numpy         == 1.26.4
 
 opencv-python == 4.9.0.80
-
-packaging     == 23.2
 
 pillow        == 10.2.0
 
