@@ -7,9 +7,9 @@ Get the releases here: https://github.com/giacomoh/reference-picker/releases
 
 # Info
 
-Hi, this is a program for selecting and displaying images.
+Hi, this is a program for randomly selecting and displaying images.
 It will ask you to select a folder the first time you run this, then it will create txt file in its same folder to remember the last folder you chose.
-You can rotate, fip, zoom move around add a couple of filters, etc
+There's a timer, you can rotate, fip, zoom move around add a couple of filters, etc
 If you apply multiple filters at once they might break, clicking reset will return everything to how it should be.
 
 It's just a python script so i'm not converting it into an EXE, just click on it.
