@@ -40,7 +40,7 @@ just download the latest python version, then open your CMD and >pip install X (
 # To do
 - smoother image movement (lags on larger files)
 - sliders for zoom and posterisation
-- ???
+- rewrite this but for C++, looks like i underestimated how intensive on the CPU this program would end up being
 
 If you have any features you'd like to see added you can message me or open a pull request!
 
