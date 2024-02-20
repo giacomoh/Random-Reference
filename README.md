@@ -38,7 +38,8 @@ But if you don't want to install and run it, you can use the python script.
 just download the latest python version, then open your CMD and >pip install X (where X is pillow, customtkinter, tkinter, etc)
 
 # To do
-- smoother image movement (lags slightly on larger files)
+- smoother image movement (lags on larger files)
+- sliders for zoom and posterisation
 - ???
 
 If you have any features you'd like to see added you can message me or open a pull request!
