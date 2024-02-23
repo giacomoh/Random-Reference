@@ -38,6 +38,7 @@ But if you don't want to install and run it, you can use the python script.
 just download the latest python version, then open your CMD and >pip install X (where X is pillow, customtkinter, tkinter, etc)
 
 # To do
+- switch from openCV to matlib
 - smoother image movement (lags on larger files)
 - sliders for zoom and posterisation
 - rewrite this but for C++, looks like i underestimated how intensive on the CPU this program would end up being
