@@ -19,6 +19,6 @@ I AM NOT A PROGRAMMER, this is held together by duct tape and broken dreams, and
 
 # To do
 
-- rewrite this but for C++, looks like i underestimated how intensive on the CPU this program would end up being 😓
+- rewrite this but for C++, looks like i underestimated how intensive this program would end up being 😓. Not bad but i'd also like it to support better color profiles and downscaling, thing that python libraries aren't good at apparently.
 
 If you have any features you'd like to see added you can message me or open a pull request!
