@@ -1,533 +1,564 @@
+import sys
+print(sys.executable)
 import os
 import random
-from tkinter import filedialog
-from PIL import Image, ImageTk, ImageOps
-import customtkinter
-import time
-import threading
-from scipy.ndimage import median_filter
+from PyQt5 import QtWidgets, QtCore, QtGui
+import pyqtgraph as pg
 import numpy as np
+from PIL import Image
+from scipy.ndimage import median_filter
+import glob
 
-class ImageViewer:
-    def __init__(self):
-        self.selected_folder = self.load_folder_path()  # Load the last selected folder path
-        self.current_image = None
-        self.current_photo = None
-        self.canvas = None
-        self.prev_x = None
-        self.prev_y = None
-        self.scale_factor = 1.0
-        self.pan_x = 0
-        self.pan_y = 0
-        self.flipped_horizontal = False
-        self.bind_mouse_events()
-        self.is_grayscale = False
-        self.image_history = []  # History of selected images
-        self.history_position = -1  # Current position in the history
-        self.original_rotation = 0  
-        self.timer = None  # Initialize self.timer
-        self.timer_delay = 1000  # Delay before picking a new image (in milliseconds)
-        self.timer_id = None  # ID of the scheduled function call-
-        self.m_time_entry = 0
-        self.s_time_entry = 0
-        self.median_filter_applied = False
-        self.original_image = None
-        self.original_image_grayscale = None
-        self.original_image_median = None
-        self.original_image_posterize = None
-        self.is_posterized = False  # Add this line
-        self.median_filter_button = None  # Initialize the median filter button
-        self.posterize_button = None  # Initialize the posterize button
-        self.grayscale_button = None  # Initialize the grayscale button
-        self.last_wheel_event_time = 0
-        self.last_move_event_time = 0
-        self.selected_folder = self.load_folder_path()  # Load the last selected folder path
-        self.bind_events()
-        if self.selected_folder:
-            # Get the list of image filenames
-            self.image_filenames = os.listdir(self.selected_folder)
-            self.pick_image()  # Automatically pick an image if a folder is already selected
-            self.bind_mouse_events()
-            if self.canvas:
-                self.canvas.bind("<MouseWheel>", self.on_mouse_wheel)
+class ImageViewer(QtWidgets.QMainWindow):
+    
+    def __init__(self, parent=None):
+        super(ImageViewer, self).__init__(parent)
+        self.setWindowFlags(self.windowFlags() | QtCore.Qt.WindowStaysOnTopHint)  # Add this line
+        self.initialize_variables()
+        self.setup_view()
+        self.load_settings()
+        self.update_images()
+        self.setup_toolbar()
+        self.timer_running = True
+        self.posterize_levels = 3
+
+    def initialize_variables(self):
+        self.img = None
+        self.image_history = []
+        self.current_image_index = None
+        self.images = []
+        self.shuffled_images = []
+        self.is_mirrored = False
+        self.transformations = []
+        self.folder_path = ""
+        # Initialize the transformation status dictionary
+        self.transformation_status = {
+            self.greyscale_transform: False,
+            self.median_filter_transform: False,
+            self.posterize_transform: False,
+            self.mirrored: False 
+        }
+
+    def setup_view(self):
+        self.view = pg.ImageView()
+        vb = self.view.getView()
+        darker_grey = QtGui.QColor(70, 70, 70)
+        darker_grey_str = darker_grey.name()
+        vb.setBackgroundColor(darker_grey)
+        self.view.ui.roiBtn.hide()
+        self.view.ui.menuBtn.hide()
+        self.view.ui.histogram.hide()
+        self.setCentralWidget(self.view)
+
+    def load_settings(self):
+        self.settings = QtCore.QSettings("Hwllw", "RandomRefPicker")
+        self.restoreGeometry(self.settings.value("geometry", QtCore.QByteArray()))
+        self.restoreState(self.settings.value("windowState", QtCore.QByteArray()))
+        lastFolderPath = self.settings.value("lastFolderPath", "")
+        if lastFolderPath:  # Check if lastFolderPath is not an empty string
+            self.folder_path = lastFolderPath
+            print(f"Last saved folder path: {self.folder_path}")
+            self.new_image()
+
+    def add_button(self, layout, text, callback, icon_path, style):
+        button = QtWidgets.QPushButton(text)
+        button.clicked.connect(callback)
+        button.setIcon(QtGui.QIcon(icon_path))
+        button.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
+
+        # Add CSS styles
+        button.setStyleSheet("""
+            QPushButton {
+                color: black;
+                background-color: #5D5D5D;
+                border: 2px solid #2E2E2E;
+                border-radius: 10px;
+                padding: 5px;
+                font-size: 20px;
+                font-family: Arial;
+            }
+            QPushButton:hover {
+                background-color: #7F7F7F;
+            }
+            QPushButton:pressed {
+                background-color: #3F3F3F;
+            }
+        """)
+
+        layout.addWidget(button)
+        return button
+
+    def setup_toolbar(self):
+        darker_grey = QtGui.QColor(70, 70, 70)
+        darker_grey_str = darker_grey.name()
+
+
+        style = f"background-color: {darker_grey_str}; color: black; font-size: 20px;"
+    
+        # Create the first toolbar
+        toolbar1 = self.addToolBar("Toolbar1")
+        toolbar1.setObjectName("UI1")
+        toolbar1.setMovable(False)  # Make toolbar1 non-movable
+        widget1 = QtWidgets.QWidget()
+        layout1 = QtWidgets.QHBoxLayout()
+        toolbar1.setStyleSheet(f"background-color: {darker_grey_str}; border: 1px solid #000000")
+        widget1.setLayout(layout1)
+
+        # Add buttons to the first toolbar
+        self.add_button(layout1, "📂", self.button1_clicked, 'path_to_icon', style)
+        self.add_button(layout1, "⏩", self.button2_clicked, 'path_to_icon', style)
+        self.add_button(layout1, "⏪", self.button3_clicked, 'path_to_icon', style)
+        self.timer_button = self.add_button(layout1, "00:00:00", self.button10_clicked, 'path_to_icon', style)
+        self.timer_button.setMinimumSize(100, 30)  # Set the minimum size of self.timer_button
+        self.add_button(layout1, "⏱️", self.convert_to_time, 'path_to_icon', style)
+
+
+        
+        # Add self.hours_input to the first toolbar
+        self.hours_input = QtWidgets.QLineEdit()
+        self.hours_input.setStyleSheet("font-size: 30px; color: black")  # Set font size and color
+        self.hours_input.setMaximumWidth(50)  # Set maximum width
+        self.hours_input.setMinimumHeight(30)  # Set minimum height
+        layout1.addWidget(self.hours_input)  # Add self.hours_input to the first toolbar
+
+        # Add self.minutes_input to the first toolbar
+        self.minutes_input = QtWidgets.QLineEdit()
+        self.minutes_input.setStyleSheet("font-size: 30px; color: black")  # Set font size and color
+        self.minutes_input.setMaximumWidth(50)  # Set maximum width
+        self.minutes_input.setMinimumHeight(30)  # Set minimum height
+        layout1.addWidget(self.minutes_input)
+
+        # Add self.seconds_input to the first toolbar
+        self.seconds_input = QtWidgets.QLineEdit()
+        self.seconds_input.setStyleSheet("font-size: 30px; color: black")  # Set font size and color
+        self.seconds_input.setMaximumWidth(50)  # Set maximum width
+        self.seconds_input.setMinimumHeight(30)  # Set minimum height
+        layout1.addWidget(self.seconds_input)
+
+        self.timer = QtCore.QTimer(self)
+        self.timer.timeout.connect(self.update_timer)
+        self.time = QtCore.QTime(0, 0)
+        self.timer.stop()
+
+        toolbar1.addWidget(widget1)
+        
+        self.hide_ui_button = self.add_button(layout1, "🔼", self.toggle_toolbar2, 'path_to_icon', style)
+        
+        # Add a break
+        self.addToolBarBreak()
+
+        # Create the second toolbar
+        self.toolbar2 = self.addToolBar("Toolbar2")
+        self.toolbar2.setObjectName("UI2")
+        self.toolbar2.setMovable(False)  # Make toolbar2 non-movable
+        widget2 = QtWidgets.QWidget()
+        layout2 = QtWidgets.QHBoxLayout()
+        self.toolbar2.setStyleSheet(f"background-color: {darker_grey_str}; border: 1px solid #000000")
+        widget2.setLayout(layout2)
+
+        # Add buttons to the second toolbar
+        self.add_button(layout2, "greyscale", self.button4_clicked, 'path_to_icon', style)
+        self.add_button(layout2, "flip", self.button5_clicked, 'path_to_icon', style)
+        self.add_button(layout2, "rotate", self.button6_clicked, 'path_to_icon', style)
+        self.add_button(layout2, "reset", self.button7_clicked, 'path_to_icon', style)
+        self.add_button(layout2, "posterize", self.button8_clicked, 'path_to_icon', style)
+
+        # Add a QSpinBox for the posterize levels
+        self.posterize_spinbox = QtWidgets.QSpinBox()
+        self.posterize_spinbox.setMinimum(1)
+        self.posterize_spinbox.setMaximum(10)
+        self.posterize_spinbox.setValue(3)  # Default value
+
+        # Add a QSpinBox for the posterize levels
+        self.posterize_spinbox = QtWidgets.QSpinBox()
+        self.posterize_spinbox.setMinimum(1)
+        self.posterize_spinbox.setMaximum(10)
+        self.posterize_spinbox.setValue(3)  # Default value
+
+        # Set the size policy
+        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Preferred, QtWidgets.QSizePolicy.Preferred)
+        sizePolicy.setVerticalStretch(2)  # Adjust the vertical stretch factor
+        self.posterize_spinbox.setSizePolicy(sizePolicy)
+
+        # Connect the valueChanged signal to a new method
+        self.posterize_spinbox.valueChanged.connect(self.update_posterize_levels)
+
+        # Set the text color to white
+        self.posterize_spinbox.setStyleSheet("font-size: 20px; color: white")  # Set font size and color
+
+        layout2.addWidget(self.posterize_spinbox)
+
+        self.toolbar2.addWidget(widget2)
+
+    def toggle_toolbar2(self):
+        # Toggle the visibility of toolbar2
+        self.toolbar2.setVisible(not self.toolbar2.isVisible())
+
+    def update_timer(self):
+        if not self.time.toString() == "00:00:00":
+            self.time = self.time.addSecs(-1)
         else:
-            self.image_filenames = []  # Initialize image_filenames to an empty list if no folder is selected
+            self.timer.stop()
+            self.new_image()  # Call pick_random_image without passing a directory path
+            self.convert_to_time()
 
+        self.timer_button.setText(self.time.toString("hh:mm:ss"))
+
+    def closeEvent(self, event):
+        # Save window size and position
+        self.settings.setValue("geometry", self.saveGeometry())
+        self.settings.setValue("windowState", self.saveState())
+        super(ImageViewer, self).closeEvent(event)
+
+    def create_button(self, text, handler, icon_path, style):
+        button = QtWidgets.QToolButton()
+        button.setText(text)
+        button.clicked.connect(handler)
+        button.setIcon(QtGui.QIcon(icon_path))
+        button.setStyleSheet(style)
+        button.setToolButtonStyle(QtCore.Qt.ToolButtonTextUnderIcon)
+        return button
+    
+    def convert_to_time(self):
+        hours = int(self.hours_input.text()) if self.hours_input.text() else 0
+        minutes = int(self.minutes_input.text()) if self.minutes_input.text() else 0
+        seconds = int(self.seconds_input.text()) if self.seconds_input.text() else 0
+        total_seconds = hours * 3600 + minutes * 60 + seconds
+        if total_seconds > 10:
+            self.time.setHMS(hours, minutes, seconds) # Stop the timer
+            self.timer.start(1000)  # Start the timer againù
+    
+    def update_images(self):
+        if self.folder_path:  # Check if folder_path is not an empty string
+            self.images = glob.glob(self.folder_path + '/**/*', recursive=True)
+            self.images = [img for img in self.images if img.endswith(('.png', '.jpg', '.jpeg'))]
+
+    def load_image(self, img_path):
+        # Load the image using PIL
+        pil_img = Image.open(img_path)
+        
+
+        # Apply Lanczos resampling
+        factor = 2  # Define the factor for Lanczos resampling
+        new_size = (int(pil_img.size[0] * factor), int(pil_img.size[1] * factor))
+        pil_img = pil_img.resize(new_size, Image.LANCZOS)
+
+        # Convert the PIL Image to a numpy array
+        img = np.array(pil_img)
+
+        self.img = np.rot90(img, 3)
+        self.img = np.fliplr(self.img)
+
+        # Store the original image before any transformations are applied
+        self.original_img = self.img.copy()
+
+        # Clear the transformations list and reset the transformation status dictionary
+        self.transformations.clear()
+        self.transformation_status = {
+            'greyscale_transform': False,
+            'median_filter_transform': False,
+            'posterize_transform': False,
+            'mirrored': False
+        }
+        # Display the image
+        self.view.setImage(self.img)
+
+    def apply_transformations(self):
+        self.img = self.original_img.copy()
+        for transform in self.transformations:
+            self.img = transform(self.img)
+        self.view.setImage(self.img)
+    
+    def greyscale_transform(self, img):
+        if img.shape[-1] in [3, 4]:
+            return np.dot(img[...,:3], [0.2989, 0.5870, 0.1140])[..., np.newaxis]
+        else:
+            return img
+
+    def update_posterize_levels(self, value):
+        # Update the posterize levels
+        self.posterize_levels = value
+        view_state = self.view.getView().getState()
+
+        # Apply the posterize transformation to the original image
+        transformed_img = self.posterize_transform(self.original_img.copy())
+        # Update the image in the view
+        self.view.setImage(transformed_img)
+
+        self.view.getView().setState(view_state)
+
+        # Set the posterize_transform flag to True
+        self.transformation_status['posterize_transform'] = True
+
+    def posterize_transform(self, img):
+        if self.posterize_levels < 1:
+            raise ValueError("Levels must be greater than 0")
+
+        if img.ndim < 2:
+            raise ValueError("Image must be at least 2D")
+
+        # Calculate the factor to reduce the color depth
+        factor = 256.0 / self.posterize_levels
+
+        # Quantize each color channel
+        img = (img / factor).astype(int) * factor
+
+        return img
     
 
-    def bind_events(self):
-        if self.canvas:
-            self.bind_mouse_events()
-            self.canvas.bind("<MouseWheel>", self.on_mouse_wheel)
-            
-    def load_folder_path(self):
-        if os.path.exists('last_opened_folder.txt'):
-            with open('last_opened_folder.txt', 'r') as f:
-                return f.read().strip()  # Remove any leading/trailing whitespace
+    def median_filter_transform(self, img, size=3):
+        # Split the image into color channels
+        channels = np.dsplit(img, img.shape[-1])
+
+        # Apply the median filter to each channel
+        filtered_channels = [median_filter(channel, size) for channel in channels]
+
+        # Recombine the channels
+        img = np.dstack(filtered_channels)
+
+        return img
+    def shift_image_to_center(self, img):
+        shift_x = img.shape[1] // 2
+        shift_y = img.shape[0] // 2
+        return np.roll(np.roll(img, shift_y, axis=0), shift_x, axis=1)
+    
+    def new_image(self):
+        # Update the list of images before selecting a new one
+        self.update_images()
+
+        if self.images:
+            # If we've gone through all the images, shuffle them again
+            if not self.shuffled_images:
+                self.shuffled_images = random.sample(self.images, len(self.images))
+
+            # Select the next image from the shuffled list
+            chosen_image = self.shuffled_images.pop()
+            print(f"Image selected: {chosen_image}")
+
+            # Add the chosen image to the history and update the current image index
+            self.image_history.append(chosen_image)
+            self.current_image_index = len(self.image_history) - 1
+
+            self.load_image(chosen_image)
         else:
-            return None  # or return an empty string ""
+            print("No images found in the selected folder.")
+            
+    def button1_clicked(self):
+        self.folder_path = QtWidgets.QFileDialog.getExistingDirectory(self, 'Select Folder')
+        print(f"Folder selected: {self.folder_path}")
 
-    def save_folder_path(self, path):
-        with open('last_opened_folder.txt', 'w') as f:
-            f.write(path)
-
-    def reset_button_colors(self):
-        # Reset the color of the median filter button
-        if self.median_filter_button:
-            self.median_filter_button.configure(fg_color="#2D2D2D")
-
-        # Reset the color of the posterize button
-        if self.posterize_button:
-            self.posterize_button.configure(fg_color="#2D2D2D")
+        # Save the last folder path
+        self.settings.setValue("lastFolderPath", self.folder_path)
+        status = self.settings.status()
+        if status == QtCore.QSettings.AccessError:
+            print("Error: Could not write settings due to an access error.")
+        elif status == QtCore.QSettings.FormatError:
+            print("Error: Could not write settings due to a format error.")
+        else:
+            print("Settings were written successfully.")
         
-        if self.grayscale_button:
-            self.grayscale_button.configure(fg_color="#2D2D2D")
+        # Update the list of images
+        self.update_images()
 
-    def select_folder(self):
-        folder_path = filedialog.askdirectory()
-        if folder_path:
-            self.selected_folder = folder_path
-            self.save_folder_path(folder_path)  # Save the selected folder path
-            print("Selected folder:", folder_path)
-            # Get the list of image filenames
-            self.image_filenames = [os.path.join(dp, f) for dp, dn, filenames in os.walk(self.selected_folder) for f in filenames if f.endswith(('.png', '.jpg', '.jpeg', '.bmp', '.svg', '.webp'))]
+        # Clear the shuffled images list so that it gets refreshed the next time button2 is clicked
+        self.shuffled_images.clear()
 
-    def pick_image(self):
-        try:
-            if self.selected_folder:
-                if not self.image_filenames:  # If all images have been picked
-                    # Reload the list of image filenames
-                    self.image_filenames = [os.path.join(dp, f) for dp, dn, filenames in os.walk(self.selected_folder) for f in filenames if f.endswith(('.png', '.jpg', '.jpeg', '.bmp', '.svg', '.webp'))]
-                # Pick a random image
-                image_filename = random.choice(self.image_filenames)
-                # Check if it's a file before opening it
-                while not os.path.isfile(image_filename):
-                    self.image_filenames.remove(image_filename)
-                    image_filename = random.choice(self.image_filenames)
-                # Remove the selected image from the list
-                self.image_filenames.remove(image_filename)
-                print("Selected image:", image_filename)
-                self.current_image = Image.open(image_filename)
-                self.current_photo = ImageTk.PhotoImage(self.current_image)
-                self.display_image()
-                self.reset_pan()
-                self.reset_scale()
-                self.flipped_horizontal = False
-                self.bind_mouse_events()
-                self.canvas.bind("<MouseWheel>", self.on_mouse_wheel)
+        # Load a new image
+        self.new_image()
 
-                # Add the selected image to the history and update the history position
-                self.image_history.append(image_filename)
-                self.history_position += 1
-                print(self.history_position)
+    def button2_clicked(self):
+        self.new_image()    
 
-                # Reset the median filter
-                self.median_filter_applied = False
-                self.original_image = None
-
-            else:
-                print("Please select a folder first.")
-        except Exception as e:
-            print("An error occurred:", e)
-        self.original_image = self.current_image
-        self.is_grayscale = False
-        self.bind_events()
-
-    def go_back(self):
-        if self.history_position > 0:
-            # Decrease the history position and load the previous image
-            self.history_position -= 1
-            file_path = self.image_history[self.history_position]
-            self.current_image = Image.open(file_path)
-            self.current_photo = ImageTk.PhotoImage(self.current_image)
-            self.display_image()
-            self.reset_pan()
-            self.reset_scale()
-            self.flipped_horizontal = False
-            self.bind_mouse_events()
-            self.canvas.bind("<MouseWheel>", self.on_mouse_wheel)
-
-            # Reset the median filter
-            self.median_filter_applied = False
-            self.original_image = None
-
-            print(self.history_position)
-
+    def button3_clicked(self):
+        if self.current_image_index is not None and self.current_image_index > 0:
+            # Go back to the previous image
+            self.current_image_index -= 1
+            previous_image = self.image_history[self.current_image_index]
+            print(f"Image selected: {previous_image}")
+            self.load_image(previous_image)
         else:
             print("No previous image.")
-        self.bind_events()
-
-    def on_move_press(self, event):
-        current_time = time.time()
-        if current_time - self.last_move_event_time < 0.1:  # Adjust the throttle rate as needed
-            return
-        self.last_move_event_time = current_time
-
-        dx = event.x - self.prev_x
-        dy = event.y - self.prev_y
-        self.prev_x = event.x
-        self.prev_y = event.y
-        self.pan_x += dx
-        self.pan_y += dy
-        self.bound_panning()
-        self.display_image()
-
-    def display_image(self):
-        if self.current_photo:
-            # Apply the scale to the image
-            scaled_image = self.current_image.resize((int(self.current_image.width * self.scale_factor), int(self.current_image.height * self.scale_factor)))
-            self.current_photo = ImageTk.PhotoImage(scaled_image)
-
-            # Display the image
-            self.canvas.config(width=self.current_photo.width(), height=self.current_photo.height())
-            self.canvas.delete("all")
-            self.canvas.create_image(self.pan_x, self.pan_y, anchor="nw", image=self.current_photo)
-
-    def rotate_image(self):
-        if self.current_photo and self.current_image:
-            # Rotate the image by 90 degrees clockwise
-            self.current_image = self.current_image.rotate(-90, expand=True)
-
-            # Scale the image
-            scaled_image = self.current_image.resize((int(self.current_image.width * self.scale_factor), int(self.current_image.height * self.scale_factor)))
-            self.current_photo = ImageTk.PhotoImage(scaled_image)
-
-            # Get the current canvas dimensions
-            canvas_width = self.canvas.winfo_width()
-            canvas_height = self.canvas.winfo_height()
-
-            self.display_image()
-
-    def flip_horizontal(self):
-        if self.current_photo and self.current_image:
-            flipped_image = ImageOps.mirror(self.current_image)
-            self.current_image = flipped_image
-            scaled_image = flipped_image.resize((int(flipped_image.width * self.scale_factor), int(flipped_image.height * self.scale_factor)))
-            self.current_photo = ImageTk.PhotoImage(scaled_image)
-
-            # Get the current canvas dimensions
-            canvas_width = self.canvas.winfo_width()
-            canvas_height = self.canvas.winfo_height()
-
-            # Calculate the new pan coordinates
-            self.pan_x = canvas_width - (self.pan_x + scaled_image.width)
-
-            self.display_image()
-            self.flipped_horizontal = not self.flipped_horizontal
-
-    def on_button_press(self, event):
-        self.prev_x = event.x
-        self.prev_y = event.y
-
-    def on_mouse_wheel(self, event):
-        current_time = time.time()
-        if current_time - self.last_wheel_event_time < 0.1:  # Adjust the throttle rate as needed
-            return
-        self.last_wheel_event_time = current_time
-        oldscale = self.scale_factor
-        self.scale_factor += event.delta / 1200.0
-        if self.scale_factor < 0.1:
-            self.scale_factor = oldscale
     
-        if event.delta > 0:
-            self.scale_factor *= 1.05
+
+    def button4_clicked(self):
+        if self.img is not None:
+            # Save the current view state
+            view_state = self.view.getView().getState()
+
+            if self.transformation_status["greyscale_transform"]:
+                # If the image is currently in greyscale, revert it to the original
+                if self.greyscale_transform in self.transformations:
+                    self.transformations.remove(self.greyscale_transform)
+                self.transformation_status["greyscale_transform"] = False
+            else:
+                # If the image is not in greyscale, convert it to greyscale and store the original
+                self.transformations.append(self.greyscale_transform)
+                self.transformation_status["greyscale_transform"] = True
+
+            self.apply_transformations()
+
+            # Restore the view state
+            self.view.getView().setState(view_state)
+            current_center_x = (view_state['targetRange'][0][0] + view_state['targetRange'][0][1]) / 2
+            print(f"Current center: {current_center_x}")
         else:
-            self.scale_factor /= 1.05
+            print("No image loaded.")
 
-        # Get the current mouse coordinates
-        mouse_x = self.canvas.canvasx(event.x)
-        mouse_y = self.canvas.canvasy(event.y)
+    def mirrored(self, img):
+        if self.view is not None:
+            # Get the ImageItem from the ImageView
+            image_item = self.view.getImageItem()
 
-        # Calculate the new image dimensions
-        new_width = int(self.current_image.width * self.scale_factor)
-        new_height = int(self.current_image.height * self.scale_factor)
+            # Get the current transformation
+            transform = image_item.transform()
 
-        # Calculate the new pan coordinates
-        self.pan_x = mouse_x - (mouse_x - self.pan_x) * (new_width / (self.current_image.width * oldscale))
-        self.pan_y = mouse_y - (mouse_y - self.pan_y) * (new_height / (self.current_image.height * oldscale))
+            # Get the ViewBox from the ImageView
+            view_box = self.view.getView()
 
-        # Resize the image and display it
-        scaled_image = self.current_image.resize((new_width, new_height))
-        self.current_photo = ImageTk.PhotoImage(scaled_image)
-        self.display_image()
-        
-    def reset_image(self):
-        if self.current_image:
-             # Reset the image to the original image before any rotation
-            self.current_image = self.original_image
-            self.original_rotation = 0  # Reset the rotation
-            self.current_photo = ImageTk.PhotoImage(self.current_image)
-            self.display_image()
-            self.reset_pan()
-            self.reset_scale()
-            self.is_grayscale = False
-            self.center_image()
-            self.reset_button_colors()
-    def center_image(self):
-        if self.current_photo:
-            canvas_width = self.canvas.winfo_width()
-            canvas_height = self.canvas.winfo_height()
-            image_width = self.current_photo.width()
-            image_height = self.current_photo.height()
+            # Get the center of the view
+            center = view_box.viewRect().center()
 
-            self.pan_x = (canvas_width - image_width) / 2
-            self.pan_y = (canvas_height - image_height) / 2
-            self.display_image()
+            # Create a mirror transformation
+            mirror = QtGui.QTransform(-1, 0, 0, 1, 2*center.x(), 0)
 
-    def resize_canvas(self, event=None):
-        if self.current_photo:
-            self.canvas.config(width=event.width, height=event.height)
-            self.canvas.config(scrollregion=(0, 0, self.current_photo.width(), self.current_photo.height()))
-
-
-    def on_resize(self, event):
-        # Update the size and position of the image on the canvas
-        # Replace 'image_id' with the actual ID of the image on the canvas
-        canvas.coords('image_id', 0, 0, event.width, event.height)
-
-    def update_canvas(self):
-        if self.current_photo:
-            self.canvas.config(width=self.current_photo.width(), height=self.current_photo.height())
-            self.canvas.delete("all")
-            self.canvas.create_image(0, 0, anchor="nw", image=self.current_photo)
-
-
-    def bind_mouse_events(self):
-        if self.canvas:
-            self.canvas.bind("<ButtonPress-1>", self.on_button_press)
-            self.canvas.bind("<B1-Motion>", self.on_move_press)
-
-    def bound_panning(self):
-        if self.current_photo:
-            image_width = self.current_photo.width() * self.scale_factor
-            image_height = self.current_photo.height() * self.scale_factor
-            canvas_width = self.canvas.winfo_width()
-            canvas_height = self.canvas.winfo_height()
-
-            # Allow panning beyond the image boundaries by a certain factor of the canvas size
-            pan_limit_x = canvas_width * 5  # 50% of the canvas width
-            pan_limit_y = canvas_height * 5  # 50% of the canvas height
-
-            self.pan_x = min(pan_limit_x, max(self.pan_x, -image_width + canvas_width - pan_limit_x))
-            self.pan_y = min(pan_limit_y, max(self.pan_y, -image_height + canvas_height - pan_limit_y))
+            # If the image is currently mirrored, revert it to the original
+            if self.is_mirrored:
+                image_item.setTransform(transform * mirror.inverted()[0])
+                self.is_mirrored = False
+                return img
+            else:
+                # If the image is not mirrored, apply the mirror transformation
+                image_item.setTransform(transform * mirror)
+                self.is_mirrored = True
+                return np.flipud(img)
         else:
-            self.pan_x = 0
-            self.pan_y = 0
+            return img
 
-    def reset_pan(self):
-        self.pan_x = self.pan_y = 0
-
-    def reset_scale(self):
-        self.scale_factor = 1.0
-
-    def start_timer(self):
-        if self.timer:  # If a timer is already running
-            self.timer.cancel()  # Cancel the existing timer
-        h = int(h_time_entry.get())
-        m = int(m_time_entry.get())
-        s = int(s_time_entry.get())
-        self.total_seconds = h * 3600 + m * 60 + s
-        if self.total_seconds > 10:  # Only start the timer if the total time is greater than 10 seconds
-            self.start_time = time.time()
-            self.countdown()
-        else:
-            print("The total time must be greater than 10 seconds to start the timer.")
-
-    # Update the countdown method to correctly display hours, minutes, and seconds
-    def countdown(self):
-        if self.total_seconds > 0:
-            self.remaining_time = self.total_seconds  # Calculate remaining time at the start of each tick
-            hours, remainder = divmod(self.total_seconds, 3600)
-            minutes, seconds = divmod(remainder, 60)
-            print(f"Time left: {hours}:{minutes}:{seconds}")
-            timer.configure(text=f"{int(hours):02d}:{int(minutes):02d}:{int(seconds):02d}")
-            self.timer = threading.Timer(1.0, self.countdown)
-            self.timer.start()
-            self.total_seconds -= 1
-        else:
-            print("Bzzzt! The countdown is at zero seconds!")
-            self.pick_image()  # Call the pick_image method when the countdown reaches zero
-            self.start_timer()  # Restart the timer
-
-    def toggle_timer(self):
-        if self.timer:
-            self.stop_timer()
-        else:
-            self.resume_timer()
-
-    def stop_timer(self):
-        if self.timer:
-            self.timer.cancel()
-            self.timer = None
-            self.stop_time = time.time()
-
-    def resume_timer(self):
-        if self.remaining_time > 0 and self.stop_time:
-            self.total_seconds = self.remaining_time
-            self.countdown()
-
-    def select_all(self, event):  # Add 'event' as a second argument
-        # select text after 50ms
-        event.widget.after(50, lambda: event.widget.select_range(0, 'end'))
-
-    def create_button(master, text, command):
-        return customtkinter.CTkButton(master=master, text=text, command=command, bg_color="#909090")
-    
-    
-    def toggle_ui(self):
-        if ui_elements[0].winfo_viewable():
-            for element in ui_elements:
-                element.grid_info_store = element.grid_info()  # Store the grid options
-                element.grid_forget()
-        else:
-            for element in ui_elements:
-                grid_info = element.grid_info_store
-                # Use the stored grid options
-                element.grid(row=grid_info["row"], column=grid_info["column"], sticky=grid_info.get("sticky", ""))
-    
-    def toggle_median_filter(self):
-        if self.median_filter_applied:
-            # If the median filter is currently applied, revert it to the original
-            self.current_image = self.original_image_median.copy()
-            self.median_filter_button.configure(fg_color="#2D2D2D")
-        else:
-            # Otherwise, apply the median filter
-            # Save the original image before applying the filter
-            self.original_image_median = self.current_image.copy()
-
-            # Convert the image to RGB mode if it's not already
-            if self.current_image.mode != 'RGB':
-                self.current_image = self.current_image.convert('RGB')
-
-            # Split the image into individual color channels
-            r, g, b = self.current_image.split()
-
-            # Convert each color channel to an array and apply the median filter
-            r_filtered = Image.fromarray(median_filter(np.array(r), size=4))
-            g_filtered = Image.fromarray(median_filter(np.array(g), size=4))
-            b_filtered = Image.fromarray(median_filter(np.array(b), size=4))
-
-            # Recombine the filtered color channels into one image
-            self.current_image = Image.merge("RGB", (r_filtered, g_filtered, b_filtered))
-
-            # Change the color of the median filter button
-            self.median_filter_button.configure(fg_color="dark grey")
-
-        self.median_filter_applied = not self.median_filter_applied  # Toggle the flag
-        self.current_photo = ImageTk.PhotoImage(self.current_image)
-        self.display_image()
+    def button5_clicked(self):
+        self.img = self.mirrored(self.img)
             
+    def button6_clicked(self):
+        if self.img is not None:
+            view_state = self.view.getView().getState()
+            self.transformations.append(lambda img: np.rot90(img, 1, axes=(1, 0)))
+            self.apply_transformations()
+            self.view.getView().setState(view_state)
 
-    def toggle_posterization(self):
-        if self.is_posterized:
-            # If the image is currently posterized, revert it to the original
-            self.current_image = self.original_image_posterize.copy()
-            self.posterize_button.configure(fg_color="#2D2D2D")
+    def button7_clicked(self):
+        if self.img is not None:
+            # Clear the transformations list
+            self.transformations.clear()
+
+            # Reset the image to the original
+            self.img = self.original_img.copy()
+
+            # Reset the greyscale and posterize flags
+            self.is_greyscale = False
+            self.is_posterized = False
+
+            # Update the image view
+            self.view.setImage(self.img)
         else:
-            # Otherwise, apply the posterization effect
-            # Save the original image before posterizing
-            self.original_image_posterize = self.current_image.copy()
-            self.current_image = self.current_image.convert('P', palette=Image.ADAPTIVE, colors=8)
-            # Change the color of the median filter button
-            self.posterize_button.configure(fg_color="dark grey")
+            print("No image loaded.")
 
-        self.is_posterized = not self.is_posterized  # Toggle the flag
-        self.current_photo = ImageTk.PhotoImage(self.current_image)
-        self.display_image()  # Update the displayed image
+    def button8_clicked(self):
+        if self.img is not None:
+            # Save the current view state
+            view_state = self.view.getView().getState()
 
+            if self.transformation_status["posterize_transform"]:
+                # If the image is currently posterized, revert it to the original
+                if self.posterize_transform in self.transformations:
+                    self.transformations.remove(self.posterize_transform)
+                self.transformation_status["posterize_transform"] = False
+            else:
+                # If the image is not posterized, convert it to posterized and store the original
+                self.transformations.append(self.posterize_transform)
+                self.transformation_status["posterize_transform"] = True
 
+            self.apply_transformations()
+
+            # Restore the view state
+            self.view.getView().setState(view_state)
+        else:
+            print("No image loaded.")
     
-    def toggle_grayscale(self):
-        if self.is_grayscale:
-            # If the image is currently grayscale, revert it to the original
-            self.current_image = self.original_image_grayscale.copy()
-            self.grayscale_button.configure(fg_color="#2D2D2D")
+    def button9_clicked(self):
+        if self.img is not None:
+            # Save the current view state
+            view_state = self.view.getView().getState()
+
+            if self.transformation_status['median_filter_transform']:
+                # If the image is currently filtered, revert it to the original
+                if self.median_filter_transform in self.transformations:
+                    self.transformations.remove(self.median_filter_transform)
+                self.transformation_status['median_filter_transform'] = False
+            else:
+                # If the image is not filtered, apply the median filter and store the original
+                self.transformations.append(self.median_filter_transform)
+                self.transformation_status['median_filter_transform'] = True
+
+            self.apply_transformations()
+
+            # Restore the view state
+            self.view.getView().setState(view_state)
         else:
-            # Otherwise, apply the grayscale effect
-            # Save the original image before greyscaling
-            self.original_image_grayscale = self.current_image.copy()
-            self.current_image = ImageOps.grayscale(self.current_image)
-            # Change the color of the grayscale button
-            self.grayscale_button.configure(fg_color="dark grey")
+            print("No image loaded.")    
 
-        self.is_grayscale = not self.is_grayscale  # Toggle the flag
-        self.current_photo = ImageTk.PhotoImage(self.current_image)
-        self.display_image()  # Update the displayed image
+    def button10_clicked(self):
+        if self.timer_running:
+            self.timer.stop()
+            print("timer stop")
+            self.timer_button.setStyleSheet("""
+            QPushButton {
+                color: red;
+                background-color: #5D5D5D;
+                border: 2px solid #2E2E2E;
+                border-radius: 10px;
+                padding: 5px;
+                font-size: 20px;
+                font-family: Arial;
+            }
+            QPushButton:hover {
+                background-color: #7F7F7F;
+            }
+            QPushButton:pressed {
+                background-color: #3F3F3F;
+            }
+        """)
+            
+        else:
+            self.timer.start(1000)
+            print("timer start")
+            self.timer_button.setStyleSheet("""
+            QPushButton {
+                color: black;
+                background-color: #5D5D5D;
+                border: 2px solid #2E2E2E;
+                border-radius: 10px;
+                padding: 5px;
+                font-size: 20px;
+                font-family: Arial;
+            }
+            QPushButton:hover {
+                background-color: #7F7F7F;
+            }
+            QPushButton:pressed {
+                background-color: #3F3F3F;
+            }
+        """)
+        self.timer_running = not self.timer_running  # Toggle the value
 
-# Initialize the ImageViewer
-viewer = ImageViewer()
 
-# Initialize the Tkinter application
-app = customtkinter.CTk()
-app.geometry("1920x1080")
-app.title("Image Viewer")
-app.attributes('-topmost', True)  # This line makes the window stay on top
-# Change the background color to a dark color
-app.configure(bg="#2D2D2D")
 
-# Create a frame for the buttons
-button_frame = customtkinter.CTkFrame(master=app, bg_color="transparent")
-button_frame.grid(row=1, column=0, padx=5, pady=5)
 
-button_frame2 = customtkinter.CTkFrame(master=app, bg_color="transparent")
-button_frame2.grid(row=0, column=0, padx=5, pady=5)
+def main():
+    app = QtWidgets.QApplication(sys.argv)
 
-# Create a list to hold all the UI elements
-ui_elements = []
-ui_elements.append(button_frame)
+    mainWin = ImageViewer()
+    mainWin.show()
 
-# Configure the grid to make the columns expand
-for i in range(7):  # Replace 13 with the number of columns in your grid
-    button_frame.grid_columnconfigure(i, weight=1)
-for i in range(7):
-    button_frame2.grid_columnconfigure(i, weight=1)
+    sys.exit(app.exec_())
 
-def create_button_with_grid(master, text, command, row, column, padx=5):
-    button = customtkinter.CTkButton(master=master, text=text, command=command, fg_color="#2D2D2D")
-    button.grid(row=row, column=column, padx=padx)
-    return button
-
-# UI elements
-
-# frame1
-select_folder_button = create_button_with_grid(button_frame, "Folder", viewer.select_folder, 0, 0)
-view_button = create_button_with_grid(button_frame, "New", viewer.pick_image, 0, 1)
-go_back_button = create_button_with_grid(button_frame, "Back", viewer.go_back, 0, 2)
-flip_button = create_button_with_grid(button_frame, "Flip", viewer.flip_horizontal, 0, 3)
-rotate_button = create_button_with_grid(button_frame, "Rotate", viewer.rotate_image, 0, 4)
-reset_button = create_button_with_grid(button_frame, "Reset", viewer.reset_image, 0, 5)
-viewer.grayscale_button = create_button_with_grid(button_frame, "Grayscale", viewer.toggle_grayscale, 0, 6)
-viewer.median_filter_button = create_button_with_grid(button_frame, "Median Filter", viewer.toggle_median_filter, 0, 7)
-viewer.posterize_button = create_button_with_grid(button_frame, "Toggle Posterization", viewer.toggle_posterization, 0, 8)
-
-# frame2
-timer = customtkinter.CTkLabel(master=button_frame2, text="00:00:00", font=("Arial", 20))
-timer.grid(row=0, column=0, padx=5)
-
-def create_time_entry(master, row, column):
-    time_entry = customtkinter.CTkEntry(master=master, width=50)
-    time_entry.insert(0, '00')
-    time_entry.bind('<FocusIn>', viewer.select_all)
-    time_entry.grid(row=row, column=column, padx=5)
-    return time_entry
-
-# Use the function to create the time entries
-h_time_entry = create_time_entry(button_frame2, 0, 2)
-m_time_entry = create_time_entry(button_frame2, 0, 3)
-s_time_entry = create_time_entry(button_frame2, 0, 4)
-
-start_timer_button = create_button_with_grid(button_frame2, "Start", viewer.start_timer, 0, 5)
-stopresume_timer_button = create_button_with_grid(button_frame2, "Stop/resume", viewer.toggle_timer, 0, 1)
-toggle_ui_button = create_button_with_grid(button_frame2, "UI", viewer.toggle_ui, 0, 6)
-
-# canvas
-app.grid_rowconfigure(2, weight=1)
-app.grid_columnconfigure(0, weight=1)
-
-canvas = customtkinter.CTkCanvas(app, bg="#808080", highlightthickness=1, highlightbackground="black")
-canvas.grid(row=2, column=0, sticky='nsew', columnspan=3)
-
-viewer.canvas = canvas
-canvas.bind("<Configure>", viewer.on_resize)
-
-app.mainloop()
+if __name__ == '__main__':
+    main()
