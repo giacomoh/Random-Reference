@@ -1,9 +1,12 @@
 Get the releases here: https://github.com/giacomoh/reference-picker/releases (you only need the EXE file, make sure to put it inside a folder)
 
 # Screenshorts
-![image](https://github.com/giacomoh/reference-picker/assets/53836108/9769aee9-902e-4d34-9455-32408ab68fdd)
+![image](https://github.com/giacomoh/reference-picker/assets/53836108/91817358-6d2c-4364-a501-65d50a812e16)
 
-![image](https://github.com/giacomoh/reference-picker/assets/53836108/9952a0b5-bf5b-4e16-b11f-051814702e11)
+![image](https://github.com/giacomoh/reference-picker/assets/53836108/12121c02-9927-4109-9561-25b99cf1eae0)
+
+![image](https://github.com/giacomoh/reference-picker/assets/53836108/2e2a74b5-a87b-43d0-9dd7-30e5c0917da1)
+
 
 # Info
 
@@ -14,38 +17,10 @@ If you apply multiple filters at once they might break, clicking reset will retu
 
 It's just a python script so i'm not converting it into an EXE, just click on it.
 
-I tried a bunch of other programs like this, but there were always features that i didn't like. 
-I AM NOT A PROGRAMMER, this is held together by duct tape and broken dreams, and the code is at least 60% written by the github AI assistant.
-
-Here are the python requirements to run:
-
-tkinter
-
-customtkinter == 5.2.2
-
-darkdetect    == 0.8.0
-
-numpy         == 1.26.4
-
-opencv-python == 4.9.0.80
-
-pillow        == 10.2.0
-
-scipy         == 1.12.0
-
-You won't need to CMD install them if you use the EXE file.
-But if you don't want to install and run it, you can use the python script.
-just download the latest python version, then open your CMD and >pip install X (where X is pillow, customtkinter, tkinter, etc)
+I AM NOT A PROGRAMMER, this is held together by duct tape and broken dreams, and the code is at least 60% written by Github Copilot.
 
 # To do
-- switch from openCV to matlib
-- smoother image movement (lags on larger files)
-- sliders for zoom and posterisation
-- rewrite this but for C++, looks like i underestimated how intensive on the CPU this program would end up being
+
+- rewrite this but for C++, looks like i underestimated how intensive on the CPU this program would end up being 😓
 
 If you have any features you'd like to see added you can message me or open a pull request!
-
-                            ╱|、
-                          (˚ˎ 。7  
-                           |、˜〵          
-                           じしˍ,)ノ
