@@ -1,6 +1,6 @@
 Get the releases here: https://github.com/giacomoh/reference-picker/releases (you only need the EXE file)
 
-# Screenshorts
+# Screenshots
 ![image](https://github.com/giacomoh/reference-picker/assets/53836108/91817358-6d2c-4364-a501-65d50a812e16)
 
 ![image](https://github.com/giacomoh/reference-picker/assets/53836108/12121c02-9927-4109-9561-25b99cf1eae0)
