@@ -19,5 +19,5 @@ I AM NOT A PROGRAMMER, this is held together by duct tape and broken dreams, and
 # To do
 
 - rewrite this but in C++, looks like i underestimated how intensive this program would end up being. Not bad but i'd like it to support better color profiles and downscaling, things that python libraries aren't really good at apparently.
-
+- zoom slider, for when you need something more precise than the scroll wheel
 If you have any features you'd like to see added you can message me or open a pull request!
