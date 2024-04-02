@@ -17,6 +17,7 @@ Keep everything in the same folder! When installing too you will need to keep th
 To download click on the setup.exe and set the install location.
 To uninstall click on setup.exe and click then select uninstall.
 
+the c++ version looks worse than they python, but believe me it runs much better. I'll make a graphic overhaul for the actual release.
 # To do
 
 - image rotation
