@@ -1,23 +1,26 @@
-Get the releases here: https://github.com/giacomoh/reference-picker/releases (you only need the EXE file)
+Get the releases here: https://github.com/giacomoh/reference-picker/releases
 
 # Screenshots
-![image](https://github.com/giacomoh/reference-picker/assets/53836108/91817358-6d2c-4364-a501-65d50a812e16)
+![image](https://github.com/giacomoh/reference-picker/assets/53836108/ed504249-2620-4ded-b4b9-e95f89ff0890)
 
-![image](https://github.com/giacomoh/reference-picker/assets/53836108/12121c02-9927-4109-9561-25b99cf1eae0)
-
-![image](https://github.com/giacomoh/reference-picker/assets/53836108/2e2a74b5-a87b-43d0-9dd7-30e5c0917da1)
+![image](https://github.com/giacomoh/reference-picker/assets/53836108/3334a95b-116e-4250-aaec-14c3fadab0cc)
 
 # Info
 
 Hi, this is a program for randomly selecting and displaying images.
-It will ask you to select a folder the first time you run this, then it will remember it.
-It always runs on top of all other windows, there's a timer, you can rotate, fip, zoom move around add a couple of filters, etc
-If you apply multiple filters at once they might break, clicking reset will return everything to how it was. I'm still fixing those.
+The first time you open it, it will ask you a folder from which to pick the images. Afterwards it will remember it.
+You can view images, flip them, add a bunch of filters and more.
+Since i moved from python to c++ it's able to read the image color profiles (ICCs) and show them automatically images that used to look dull on the old app now look better.
 
-I AM NOT A PROGRAMMER, this is held together by duct tape and broken dreams, and the code is at least 60% written by Github Copilot.
+Keep everything in the same folder! When installing too you will need to keep the MSI file and the EXE file in the same folder. 
 
+To download click on the setup.exe and set the install location.
+To uninstall click on setup.exe and click then select uninstall.
+
+the c++ version looks worse than they python, but believe me it runs much better. I'll make a graphic overhaul for the actual release.
 # To do
 
-- rewrite this but in C++ when i have some more free time, looks like i underestimated how intensive this program would end up being. it's not bad but i'd like it to support better color profiles and downscaling, things that python libraries aren't really good at apparently.
-- zoom slider, for when you need something more precise than the scroll wheel
-If you have any features you'd like to see added you can message me or open a pull request!
+- image rotation
+- more file supported (for now all the popular files are supported: pngs, jpgs, webps, etc)
+- better posterize, for my needs it's ok but it messes with smaller resolution images right now.
+- i need to make it look cooler!
