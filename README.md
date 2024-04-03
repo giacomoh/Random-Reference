@@ -1,9 +1,12 @@
 Get the releases here: https://github.com/giacomoh/reference-picker/releases
 
 # Screenshots
-![image](https://github.com/giacomoh/reference-picker/assets/53836108/ed504249-2620-4ded-b4b9-e95f89ff0890)
 
-![image](https://github.com/giacomoh/reference-picker/assets/53836108/3334a95b-116e-4250-aaec-14c3fadab0cc)
+![image](https://github.com/giacomoh/reference-picker/assets/53836108/3abf46bc-7e30-4734-9261-a3271796297e)
+
+![image](https://github.com/giacomoh/reference-picker/assets/53836108/fe020aed-7b25-43cb-90ba-115d8b9fdc1c)
+
+![image](https://github.com/giacomoh/reference-picker/assets/53836108/1d7de2db-1e8d-4858-9d1f-ae0650628d44)
 
 # Info
 
