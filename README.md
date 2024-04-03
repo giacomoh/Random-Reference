@@ -6,6 +6,8 @@ Get the releases here: https://github.com/giacomoh/reference-picker/releases
 
 ![image](https://github.com/giacomoh/reference-picker/assets/53836108/fe020aed-7b25-43cb-90ba-115d8b9fdc1c)
 
+![image](https://github.com/giacomoh/reference-picker/assets/53836108/7981ad24-ff63-45ae-be84-78f02ebf86cf)
+
 ![image](https://github.com/giacomoh/reference-picker/assets/53836108/1d7de2db-1e8d-4858-9d1f-ae0650628d44)
 
 # Info
