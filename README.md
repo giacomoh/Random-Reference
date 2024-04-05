@@ -4,6 +4,9 @@ Get the releases here: https://github.com/giacomoh/reference-picker/releases
 
 ![image](https://github.com/giacomoh/reference-picker/assets/53836108/3abf46bc-7e30-4734-9261-a3271796297e)
 
+![image](https://github.com/giacomoh/reference-picker/assets/53836108/df37ab6c-b44b-4415-a4c1-4f7c54d56d2a)
+It's decently lightweight, the only limit is the size of your current image. 
+
 ![image](https://github.com/giacomoh/reference-picker/assets/53836108/fe020aed-7b25-43cb-90ba-115d8b9fdc1c)
 
 ![image](https://github.com/giacomoh/reference-picker/assets/53836108/7981ad24-ff63-45ae-be84-78f02ebf86cf)
