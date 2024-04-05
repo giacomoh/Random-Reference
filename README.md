@@ -27,5 +27,5 @@ the c++ version looks worse than they python, but believe me it runs much better
 
 - image rotation
 - more file supported (for now all the popular files are supported: pngs, jpgs, webps, etc)
-- better posterize, for my needs it's ok but it messes with smaller resolution images right now.
+- better filters? i'm still testing how much i can push them while keeping it all lightweight 
 - i need to make it look cooler!
