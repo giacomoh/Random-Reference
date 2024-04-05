@@ -22,6 +22,8 @@ The first time you open it, it will ask you a folder from which to pick the imag
 You can view images, flip them, add a bunch of filters and more.
 Since i moved from python to c++ it's able to read the image color profiles (ICCs) and show them automatically images that used to look dull on the old app now look better.
 
+You can stop the timer by clicking on it. It's going to turn red when it's paused.
+
 Keep everything in the same folder! When installing too you will need to keep the MSI file and the EXE file in the same folder. 
 
 To download click on the setup.exe and set the install location.
