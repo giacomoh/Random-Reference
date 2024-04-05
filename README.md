@@ -1,6 +1,6 @@
 WINDOWS ONLY!
 
-Get the releases here: [https://github.com/giacomoh/reference-picker/releases](https://github.com/giacomoh/Random-Reference/tags)
+Get the releases here: https://github.com/giacomoh/Random-Reference/tags
 
 # Screenshots
 
