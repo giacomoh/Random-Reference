@@ -1,3 +1,5 @@
+WINDOWS ONLY!
+
 Get the releases here: https://github.com/giacomoh/reference-picker/releases
 
 # Screenshots
