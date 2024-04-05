@@ -37,4 +37,5 @@ the c++ version looks worse than the python one, but believe me it runs much bet
 - better filters? i'm still testing how much i can push them while keeping it all lightweight 
 - i need to make it look cooler!
 - add icons
-- better installation folder organization 
+- better installation folder organization
+- add open>recent (or save/delete paths)
