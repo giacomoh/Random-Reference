@@ -25,6 +25,7 @@
 
 #include <MagickWand.h>
 #include <QSpinBox>
+#include <QGraphicsBlurEffect>
 
 class ZoomableGraphicsView : public QGraphicsView
 {
@@ -141,11 +142,7 @@ MainWindow::MainWindow(QWidget* parent)
     levelsSpinBox->setRange(2, 99);  // Set the range of the spin box to fit only two characters
     levelsSpinBox->setValue(4);  // Set the initial value
 
-    // Calculate the width for two digits and set it
     QFontMetrics fm(levelsSpinBox->font());
-    int width = fm.horizontalAdvance("000000");  // Width of two digits
-    levelsSpinBox->setFixedWidth(width);
-
     buttonLayout->addWidget(levelsSpinBox);
 
     // Connect the spin box valueChanged signal to a lambda function that updates the levels variable
@@ -159,6 +156,10 @@ MainWindow::MainWindow(QWidget* parent)
         onPosterizeButtonClicked(this->levels);  // Make sure to use the levels member variable of the MainWindow class
         qDebug() << "Updated levels: " << this->levels;
         });
+
+    QPushButton* blurButton = new QPushButton("Blur");
+    connect(blurButton, &QPushButton::clicked, this, &MainWindow::onBlurButtonClicked);
+    buttonLayout->addWidget(blurButton);
 
 
     QVBoxLayout* layout = new QVBoxLayout;
@@ -192,8 +193,12 @@ MainWindow::MainWindow(QWidget* parent)
 
     connect(timer, &QTimer::timeout, this, [this, timer, timeButton]() {
         this->countdownTime = this->countdownTime.addSecs(-1);
-        qDebug() << "Updated countdown time: " << this->countdownTime.toString("hh:mm:ss");
-        timeButton->setText(this->countdownTime.toString("hh:mm:ss"));
+        qDebug() << "Updated countdown time: " << this->countdownTime.toString("hh : mm : ss");
+        QString timeText = this->countdownTime.toString("h : mm : ss");
+        if (this->countdownTime.hour() == 0) {
+            timeText = this->countdownTime.toString("m : ss");
+        }
+        timeButton->setText(timeText);
         if (this->countdownTime == QTime(0, 0)) {
             this->loadImageFromDirectory(m_directory);  // Load a new image from the directory
         }
@@ -202,15 +207,11 @@ MainWindow::MainWindow(QWidget* parent)
     connect(timeButton, &QPushButton::clicked, this, [this, timer, timeButton]() {
         if (this->isTimerRunning) {
             timer->stop();
-            QPalette palette = timeButton->palette();
-            palette.setColor(QPalette::ButtonText, Qt::red);
-            timeButton->setPalette(palette);
+            timeButton->setStyleSheet("color: red");
         }
         else {
             timer->start(1000);
-            QPalette palette = timeButton->palette();
-            palette.setColor(QPalette::ButtonText, Qt::black);
-            timeButton->setPalette(palette);
+            timeButton->setStyleSheet("color: black");
         }
         this->isTimerRunning = !this->isTimerRunning;
         });
@@ -231,14 +232,54 @@ MainWindow::MainWindow(QWidget* parent)
     QFont font;
     font.setPointSize(12); // Set the font size to 14
 
+    // Create a QFont object for the timer
+    QFont timerFont;
+    timerFont.setPointSize(12); // Set the font size to 12
+    timerFont.setBold(true); // Set the font weight to bold
+
+
     // Set the font for the labels
     openButton->setFont(font);
     nextButton->setFont(font);
     flipButton->setFont(font);
     grayscaleButton->setFont(font);
-    timeButton->setFont(font);
     startTimerButton->setFont(font);
     posterizeButton->setFont(font);
+    blurButton->setFont(font);
+
+    // Set the font for the timer
+    timeButton->setFont(timerFont);
+
+    // Set the font for the spin boxes
+    hoursSpinBox->setFont(font);
+    minutesSpinBox->setFont(font);
+    secondsSpinBox->setFont(font);
+    levelsSpinBox->setFont(font);
+
+    // Set the stylesheet for the spin boxes
+    QString spinBoxStyle = "QSpinBox { background-color: #d3d3d3; color: #000000; border-radius: 5px; padding: 5px; } QSpinBox:hover { background-color: #c0c0c0; }";
+    hoursSpinBox->setStyleSheet(spinBoxStyle);
+    minutesSpinBox->setStyleSheet(spinBoxStyle);
+    secondsSpinBox->setStyleSheet(spinBoxStyle);
+    levelsSpinBox->setStyleSheet(spinBoxStyle);
+
+
+    // Set the size policy for the buttons
+    QSizePolicy sizePolicy(QSizePolicy::Minimum, QSizePolicy::Fixed);
+    openButton->setSizePolicy(sizePolicy);
+    nextButton->setSizePolicy(sizePolicy);
+    flipButton->setSizePolicy(sizePolicy);
+    grayscaleButton->setSizePolicy(sizePolicy);
+    posterizeButton->setSizePolicy(sizePolicy);
+    blurButton->setSizePolicy(sizePolicy);
+    startTimerButton->setSizePolicy(sizePolicy);
+    timeButton->setSizePolicy(sizePolicy);
+
+    // Set the size policy for the spin boxes
+    hoursSpinBox->setSizePolicy(sizePolicy);
+    minutesSpinBox->setSizePolicy(sizePolicy);
+    secondsSpinBox->setSizePolicy(sizePolicy);
+    levelsSpinBox->setSizePolicy(sizePolicy);
 
     // Create a ZoomableGraphicsView and add it to the layout
     m_view = new ZoomableGraphicsView(new QGraphicsScene(this));
@@ -350,11 +391,61 @@ void MainWindow::onPosterizeButtonClicked(int levels)
         m_isPosterized = false;
     }
 }
+void MainWindow::onBlurButtonClicked()
+{
+    if (m_view->scene()->items().isEmpty()) {
+        qDebug() << "Scene is empty";
+        return;
+    }
+
+    if (!m_isBlurred) {
+        // Create deep copies of the original and grayscale images
+        QImage originalImage = m_originalPixmapItem->pixmap().toImage().copy();
+        QImage grayscaleImage = m_grayscalePixmapItem->pixmap().toImage().copy();
+
+        // Check if the images are larger than 1000x1000 pixels and reduce their size by half if they are
+        if (originalImage.width() > 1500 || originalImage.height() > 1500) {
+            originalImage = originalImage.scaled(originalImage.width() / 2, originalImage.height() / 2, Qt::KeepAspectRatio, Qt::SmoothTransformation);
+        }
+        if (grayscaleImage.width() > 1500 || grayscaleImage.height() > 1500) {
+            grayscaleImage = grayscaleImage.scaled(grayscaleImage.width() / 2, grayscaleImage.height() / 2, Qt::KeepAspectRatio, Qt::SmoothTransformation);
+        }
+
+        // Convert the copied images to cv::Mat
+        cv::Mat originalMat = cv::Mat(originalImage.height(), originalImage.width(), CV_8UC4, originalImage.bits(), static_cast<size_t>(originalImage.bytesPerLine()));
+        cv::Mat grayscaleMat = cv::Mat(grayscaleImage.height(), grayscaleImage.width(), CV_8UC4, grayscaleImage.bits(), static_cast<size_t>(grayscaleImage.bytesPerLine()));
+
+        // Apply a Gaussian blur to the original and grayscale images
+        cv::GaussianBlur(originalMat, originalMat, cv::Size(0, 0), 5);
+        cv::GaussianBlur(grayscaleMat, grayscaleMat, cv::Size(0, 0), 5);
+
+        // Convert the cv::Mat images back to QImage
+        QImage blurredOriginalImage = QImage(originalMat.data, originalMat.cols, originalMat.rows, originalMat.step, QImage::Format_ARGB32);
+        QImage blurredGrayscaleImage = QImage(grayscaleMat.data, grayscaleMat.cols, grayscaleMat.rows, grayscaleMat.step, QImage::Format_ARGB32);
+
+        // Set the pixmaps of the QGraphicsPixmapItems to the blurred images
+        m_originalPixmapItem->setPixmap(QPixmap::fromImage(blurredOriginalImage));
+        m_grayscalePixmapItem->setPixmap(QPixmap::fromImage(blurredGrayscaleImage));
+
+        m_isBlurred = true;
+    }
+    else {
+        // Revert back to the original and grayscale images
+        m_originalPixmapItem->setPixmap(m_originalPixmap);
+        m_grayscalePixmapItem->setPixmap(m_grayscalePixmap);
+        m_isBlurred = false;
+    }
+}
+
 
 QImage MainWindow::posterizeImage(const QImage& image, int levels)
 {
-    // Reduce the quality of the image to 25%
-    QImage reducedImage = image.scaled(image.width() * 0.3, image.height() * 0.3, Qt::IgnoreAspectRatio, Qt::FastTransformation);
+    QImage reducedImage = image;
+
+    // Only reduce the image if its width or height is greater than 2000 pixels
+    if (image.width() > 2000 || image.height() > 2000) {
+        reducedImage = image.scaled(image.width() * 0.5, image.height() * 0.5, Qt::IgnoreAspectRatio, Qt::FastTransformation);
+    }
 
     // Posterize the reduced image
     int levelSize = 256 / levels;
@@ -439,7 +530,7 @@ void MainWindow::loadImageFromDirectory(const QString& directory)
     QString imagePath = getRandomImage(directory); // Use getRandomImage to select a random image
 
     if (imagePath.isEmpty()) {
-        qDebug() << "No image found in directory";
+        QMessageBox::information(this, tr("No Image Found"), tr("No image found in directory"));
         return;
     }
 
@@ -450,8 +541,9 @@ void MainWindow::loadImageFromDirectory(const QString& directory)
     magickWand = NewMagickWand();
     qDebug() << "Initialized MagickWand";
 
-    if (MagickReadImage(magickWand, imagePath.toStdString().c_str()) == MagickFalse) {
+    if (MagickReadImage(magickWand, imagePath.toLocal8Bit().constData()) == MagickFalse) {
         qDebug() << "Failed to read image";
+        QMessageBox::critical(this, tr("Image Load Error"), tr("Failed to load image: ") + imagePath);
         DestroyMagickWand(magickWand);
         MagickWandTerminus();
         return;
