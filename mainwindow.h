@@ -19,6 +19,7 @@ public:
     QString getRandomImage(const QString& directory);
     int levels;  // Add this line
     QImage posterizeImage(const QImage& image, int levels);
+    bool m_isBlurred = false;
 
 private slots:
     void onOpenButtonClicked();
@@ -26,6 +27,7 @@ private slots:
     void onFlipButtonClicked();
     void onGrayscaleButtonClicked();  // Declare the onGrayscaleButtonClicked function
     void onPosterizeButtonClicked(int levels);
+    void onBlurButtonClicked();
 
 private:
     ZoomableGraphicsView* m_view;  // Declare the m_view member variable
