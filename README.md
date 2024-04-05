@@ -39,3 +39,4 @@ the c++ version looks worse than the python one, but believe me it runs much bet
 - add icons
 - better installation folder organization
 - add open>recent (or save/delete paths)
+- fix images with special characters in the path won't load (rename them or the directory they're in to fix this. you can use power rename or just a powershell script)
