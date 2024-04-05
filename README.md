@@ -36,3 +36,5 @@ the c++ version looks worse than the python one, but believe me it runs much bet
 - more file supported (for now all the popular files are supported: pngs, jpgs, webps, etc)
 - better filters? i'm still testing how much i can push them while keeping it all lightweight 
 - i need to make it look cooler!
+- add icons
+- better installation folder organization 
