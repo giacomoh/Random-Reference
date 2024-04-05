@@ -19,7 +19,7 @@ It's decently lightweight, the only limit is the size of your current image.
 
 Hi, this is a program for randomly selecting and displaying images.
 The first time you open it, it will ask you a folder from which to pick the images. Afterwards it will remember it.
-You can view images, flip them, add a bunch of filters and more.
+You can view images, flip them, add a bunch of filters and more. When the timer reaches 0 it will start again and pick a new image.
 Since i moved from python to c++ it's able to read the image color profiles (ICCs) and show them automatically images that used to look dull on the old app now look better.
 
 You can stop the timer by clicking on it. It's going to turn red when it's paused.
