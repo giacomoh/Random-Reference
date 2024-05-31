@@ -189,9 +189,6 @@ MainWindow::MainWindow(QWidget* parent)
     m_view->scene()->addItem(m_horizontalLine);
     m_view->scene()->addItem(m_verticalLine);
 
-    // Initially hide the lines
-    m_horizontalLine->setVisible(false);
-    m_verticalLine->setVisible(false);
 
 
 
@@ -285,12 +282,24 @@ MainWindow::MainWindow(QWidget* parent)
     connect(medianFilterButton, &QPushButton::clicked, this, &MainWindow::onMedianFilterButtonClicked);
     buttonLayout2->addWidget(medianFilterButton);
 
-    QPushButton* toggleLinesButton = new QPushButton("Toggle Lines");
+    QPushButton* toggleLinesButton = new QPushButton("Lines");
     buttonLayout2->addWidget(toggleLinesButton);
     connect(toggleLinesButton, &QPushButton::clicked, this, [this]() {
         bool isVisible = m_view->horizontalLine()->isVisible();
         m_view->horizontalLine()->setVisible(!isVisible);
         m_view->verticalLine()->setVisible(!isVisible);
+        });
+
+    QPushButton* infoButton = new QPushButton("?");
+    buttonLayout2->addWidget(infoButton);
+    connect(infoButton, &QPushButton::clicked, this, [this]() {
+        QMessageBox infoBox;
+        infoBox.setWindowTitle("Information");
+        infoBox.setText("CTRL+drag to move the red \"plumb lines\".\n\n"
+            "If you start a session and don't wish to complete it you should probably quit and reopen the app to avoid any weird issues.\n\n"
+            "expect a few bugs! This is version 0.9 so not the final final release. Message me if you wish to add something or report a bug!");
+        infoBox.setStandardButtons(QMessageBox::Ok);
+        infoBox.exec();
         });
 
     // Add both QHBoxLayouts to the main QVBoxLayout
@@ -425,6 +434,7 @@ MainWindow::MainWindow(QWidget* parent)
     startScheduleButton->setFont(font);
     editScheduleButton->setFont(font);
 	toggleLinesButton->setFont(font);
+	infoButton->setFont(font);
 
     // Set the font for the timer
     timeButton->setFont(timerFont);
@@ -1000,7 +1010,9 @@ void MainWindow::loadImageFromDirectory(const QString& directory)
     m_view->verticalLine()->setPen(pen);
     m_view->scene()->addItem(m_view->verticalLine());
 
-    // Your existing code to handle the rest of the function...
+    // Initially hide the lines
+    m_view->horizontalLine()->setVisible(false);
+    m_view->verticalLine()->setVisible(false);
 }
 
 
