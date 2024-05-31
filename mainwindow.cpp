@@ -18,6 +18,7 @@
 #include <cstdint>
 #include <QTimeEdit>
 #include <QLabel>
+#include <QMenu>
 
 #include <lcms2.h>
 #include <windows.h>
@@ -26,6 +27,27 @@
 #include <MagickWand.h>
 #include <QSpinBox>
 #include <QGraphicsBlurEffect>
+#include <QSplitter>
+
+#include <QListWidget>
+
+#include <QSettings>  // Add this line
+
+class SelectAllSpinBox : public QSpinBox
+{
+public:
+    SelectAllSpinBox(QWidget* parent = nullptr) : QSpinBox(parent)
+    {
+        setFocusPolicy(Qt::ClickFocus);  // Set the focus policy in the constructor
+    }
+
+protected:
+    void mousePressEvent(QMouseEvent* event) override
+    {
+        QSpinBox::mousePressEvent(event);
+        this->selectAll();
+    }
+};
 
 class ZoomableGraphicsView : public QGraphicsView
 {
@@ -35,6 +57,13 @@ public:
         setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
         setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     }
+
+    QGraphicsLineItem* horizontalLine() const { return m_horizontalLine; }
+    QGraphicsLineItem* verticalLine() const { return m_verticalLine; }
+
+    void setHorizontalLine(QGraphicsLineItem* line) { m_horizontalLine = line; }
+    void setVerticalLine(QGraphicsLineItem* line) { m_verticalLine = line; }
+
 
 protected:
     void wheelEvent(QWheelEvent* event) override
@@ -64,9 +93,51 @@ protected:
     {
         if (event->button() == Qt::LeftButton) {
             m_lastPanPoint = event->pos();
-            setCursor(Qt::ClosedHandCursor);
+            if (event->modifiers() == Qt::ControlModifier) {
+                QPen pen(Qt::red, 2); // Set color to red and width to 2
+                QPointF scenePoint = mapToScene(m_lastPanPoint);
+                if (!m_horizontalLine) {
+                    m_horizontalLine = new QGraphicsLineItem(scenePoint.x(), 0, scenePoint.x(), scene()->height());
+                    m_horizontalLine->setPen(pen);
+                    scene()->addItem(m_horizontalLine);
+                }
+                else {
+                    m_horizontalLine->setLine(scenePoint.x(), 0, scenePoint.x(), scene()->height());
+                }
+                if (!m_verticalLine) {
+                    m_verticalLine = new QGraphicsLineItem(0, scenePoint.y(), scene()->width(), scenePoint.y());
+                    m_verticalLine->setPen(pen);
+                    scene()->addItem(m_verticalLine);
+                }
+                else {
+                    m_verticalLine->setLine(0, scenePoint.y(), scene()->width(), scenePoint.y());
+                }
+            }
         }
         QGraphicsView::mousePressEvent(event);
+    }
+
+    void mouseMoveEvent(QMouseEvent* event) override
+    {
+        if (!m_lastPanPoint.isNull()) {
+            if (m_horizontalLine && m_verticalLine && (event->modifiers() & Qt::ControlModifier)) {
+                QPointF scenePoint = mapToScene(event->pos());
+                m_horizontalLine->setLine(scenePoint.x(), 0, scenePoint.x(), scene()->height());
+                m_verticalLine->setLine(0, scenePoint.y(), scene()->width(), scenePoint.y());
+            }
+            else {
+                // Get how much we panned
+                QPointF delta = mapToScene(m_lastPanPoint) - mapToScene(event->pos());
+                m_lastPanPoint = event->pos();
+
+                // Update the center (i.e., adjust the view)
+                setSceneRect(sceneRect().translated(delta.x(), delta.y()));
+            }
+        }
+        // Only call the base class implementation if Control is not pressed
+        if (!(event->modifiers() & Qt::ControlModifier)) {
+            QGraphicsView::mouseMoveEvent(event);
+        }
     }
 
     void mouseReleaseEvent(QMouseEvent* event) override
@@ -78,23 +149,13 @@ protected:
         QGraphicsView::mouseReleaseEvent(event);
     }
 
-    void mouseMoveEvent(QMouseEvent* event) override
-    {
-        if (!m_lastPanPoint.isNull()) {
-            // Get how much we panned
-            QPointF delta = mapToScene(m_lastPanPoint) - mapToScene(event->pos());
-            m_lastPanPoint = event->pos();
-
-            // Update the center (i.e., adjust the view)
-            setSceneRect(sceneRect().translated(delta.x(), delta.y()));
-        }
-        QGraphicsView::mouseMoveEvent(event);
-    }
 
 private:
+    QGraphicsLineItem* m_horizontalLine = nullptr;
+    QGraphicsLineItem* m_verticalLine = nullptr;
     QPoint m_lastPanPoint;
-};
 
+};
 
 
 MainWindow::MainWindow(QWidget* parent)
@@ -107,43 +168,102 @@ MainWindow::MainWindow(QWidget* parent)
     timer(new QTimer(this)),
     levels(4), // Initialize levels to 4
     isTimerRunning(false), // Initialize isTimerRunning to false
-    startTimerButton(new QPushButton("Start Timer")) // Initialize startTimerButton
+    startTimerButton(new QPushButton("Start")),// Initialize startTimerButton
+    m_isMedianFiltered(false), // Initialize m_isMedianFiltered to false
+    currentScheduleIndex(0),
+    scheduleActive(false),  // Initialize scheduleActive to false
+    m_horizontalLine(nullptr),
+    m_verticalLine(nullptr)
+
 {
+    // Initialize m_view and its scene
+    QGraphicsScene* scene = new QGraphicsScene(this);
+    m_view = new ZoomableGraphicsView(scene);
+
+    // Now you can use m_view and its scene
+    // Initialize the lines
+    m_horizontalLine = new QGraphicsLineItem(0, m_view->scene()->height() / 2, m_view->scene()->width(), m_view->scene()->height() / 2);
+    m_verticalLine = new QGraphicsLineItem(m_view->scene()->width() / 2, 0, m_view->scene()->width() / 2, m_view->scene()->height());
+
+    // Add the lines to the scene
+    m_view->scene()->addItem(m_horizontalLine);
+    m_view->scene()->addItem(m_verticalLine);
+
+    // Initially hide the lines
+    m_horizontalLine->setVisible(false);
+    m_verticalLine->setVisible(false);
+
+
+
+    qDebug() << "Final loaded schedule:" << schedule;
 
     // Make the window always stay on top
     setWindowFlags(windowFlags() | Qt::WindowStaysOnTopHint);
 
 
-    QHBoxLayout* buttonLayout = new QHBoxLayout;  // Declare buttonLayout
-   
+    // Create two QHBoxLayouts for two rows of buttons and spinboxes
+    QHBoxLayout* buttonLayout1 = new QHBoxLayout;
+    QHBoxLayout* buttonLayout2 = new QHBoxLayout;
 
 
+    // Add buttons and spinboxes to the first row
     QPushButton* openButton = new QPushButton("Open");
     connect(openButton, &QPushButton::clicked, this, &MainWindow::onOpenButtonClicked);
-    buttonLayout->addWidget(openButton);
+    buttonLayout1->addWidget(openButton);
+
+    QPushButton* historyButton = new QPushButton("History");
+    connect(historyButton, &QPushButton::clicked, this, &MainWindow::onHistoryButtonClicked);
+    buttonLayout1->addWidget(historyButton);
 
     QPushButton* nextButton = new QPushButton("Next");
     connect(nextButton, &QPushButton::clicked, this, &MainWindow::onNextButtonClicked);
-    buttonLayout->addWidget(nextButton);
+    buttonLayout1->addWidget(nextButton);
 
     QPushButton* flipButton = new QPushButton("Flip");
     connect(flipButton, &QPushButton::clicked, this, &MainWindow::onFlipButtonClicked);
-    buttonLayout->addWidget(flipButton);
+    buttonLayout1->addWidget(flipButton);
 
     QPushButton* grayscaleButton = new QPushButton("Grayscale");
     connect(grayscaleButton, &QPushButton::clicked, this, &MainWindow::onGrayscaleButtonClicked);
-    buttonLayout->addWidget(grayscaleButton);
+    buttonLayout1->addWidget(grayscaleButton);
+
+
+    // Add buttons and spinboxes to the second row
+
+    // Add a button to start the schedule
+    QPushButton* startScheduleButton = new QPushButton("Start Schedule");
+    connect(startScheduleButton, &QPushButton::clicked, this, &MainWindow::startSchedule);
+    buttonLayout2->addWidget(startScheduleButton);
+
+    // Add a button to edit the schedule
+    QPushButton* editScheduleButton = new QPushButton("Edit Schedule");
+    connect(editScheduleButton, &QPushButton::clicked, this, &MainWindow::editSchedule);
+    buttonLayout2->addWidget(editScheduleButton);
+
+        // Add a button to rotate the image view clockwise
+    QPushButton* rotateClockwiseButton = new QPushButton("<-");
+    connect(rotateClockwiseButton, &QPushButton::clicked, this, [this]() {
+        // Assuming m_graphicsView is your QGraphicsView object
+        m_view->rotate(10);
+        });
+    buttonLayout2->addWidget(rotateClockwiseButton);
+
+    // Add a button to rotate the image view counterclockwise
+    QPushButton* rotateCounterclockwiseButton = new QPushButton("->");
+    connect(rotateCounterclockwiseButton, &QPushButton::clicked, this, [this]() {
+        // Assuming m_graphicsView is your QGraphicsView object
+        m_view->rotate(-10);
+        });
+    buttonLayout2->addWidget(rotateCounterclockwiseButton);
+
 
     QPushButton* posterizeButton = new QPushButton("Posterize");
-    buttonLayout->addWidget(posterizeButton);
+    buttonLayout2->addWidget(posterizeButton);
 
-    // Create a QSpinBox
     QSpinBox* levelsSpinBox = new QSpinBox;
-    levelsSpinBox->setRange(2, 99);  // Set the range of the spin box to fit only two characters
-    levelsSpinBox->setValue(4);  // Set the initial value
-
-    QFontMetrics fm(levelsSpinBox->font());
-    buttonLayout->addWidget(levelsSpinBox);
+    levelsSpinBox->setRange(2, 99);
+    levelsSpinBox->setValue(4);
+    buttonLayout2->addWidget(levelsSpinBox);
 
     // Connect the spin box valueChanged signal to a lambda function that updates the levels variable
     connect(levelsSpinBox, QOverload<int>::of(&QSpinBox::valueChanged), [this](int value) {
@@ -157,41 +277,54 @@ MainWindow::MainWindow(QWidget* parent)
         qDebug() << "Updated levels: " << this->levels;
         });
 
-    QPushButton* blurButton = new QPushButton("Blur");
-    connect(blurButton, &QPushButton::clicked, this, &MainWindow::onBlurButtonClicked);
-    buttonLayout->addWidget(blurButton);
+    QPushButton* blurButton = new QPushButton("Degrade");
+    connect(blurButton, &QPushButton::clicked, this, &MainWindow::onDegradeButtonClicked);
+    buttonLayout2->addWidget(blurButton);
 
+    QPushButton* medianFilterButton = new QPushButton("Median");
+    connect(medianFilterButton, &QPushButton::clicked, this, &MainWindow::onMedianFilterButtonClicked);
+    buttonLayout2->addWidget(medianFilterButton);
 
+    QPushButton* toggleLinesButton = new QPushButton("Toggle Lines");
+    buttonLayout2->addWidget(toggleLinesButton);
+    connect(toggleLinesButton, &QPushButton::clicked, this, [this]() {
+        bool isVisible = m_view->horizontalLine()->isVisible();
+        m_view->horizontalLine()->setVisible(!isVisible);
+        m_view->verticalLine()->setVisible(!isVisible);
+        });
+
+    // Add both QHBoxLayouts to the main QVBoxLayout
     QVBoxLayout* layout = new QVBoxLayout;
-    layout->setContentsMargins(0, 0, 0, 0);  // Remove margins
-    layout->addLayout(buttonLayout);  // Add buttonLayout to layout
+    layout->setContentsMargins(0, 0, 0, 0);
+    layout->addLayout(buttonLayout1);
+    layout->addLayout(buttonLayout2);
 
    
 
     QPushButton* timeButton = new QPushButton(this);
     timeButton->setText(QTime(0, 10).toString("hh:mm:ss"));  // Set initial text
-    buttonLayout->addWidget(timeButton);
+    buttonLayout1->addWidget(timeButton);
 
     // Create spin boxes for hours, minutes, and seconds
-    QSpinBox* hoursSpinBox = new QSpinBox;
+    SelectAllSpinBox* hoursSpinBox = new SelectAllSpinBox;
     hoursSpinBox->setRange(0, 23);  // Set the range of the spin box to fit hours
     hoursSpinBox->setValue(0);  // Set the initial value
-    buttonLayout->addWidget(hoursSpinBox);
+    buttonLayout1->addWidget(hoursSpinBox);
 
-    QSpinBox* minutesSpinBox = new QSpinBox;
+    SelectAllSpinBox* minutesSpinBox = new SelectAllSpinBox;
     minutesSpinBox->setRange(0, 59);  // Set the range of the spin box to fit minutes
     minutesSpinBox->setValue(10);  // Set the initial value
-    buttonLayout->addWidget(minutesSpinBox);
+    buttonLayout1->addWidget(minutesSpinBox);
 
-    QSpinBox* secondsSpinBox = new QSpinBox;
+    SelectAllSpinBox* secondsSpinBox = new SelectAllSpinBox;
     secondsSpinBox->setRange(0, 59);  // Set the range of the spin box to fit seconds
     secondsSpinBox->setValue(0);  // Set the initial value
-    buttonLayout->addWidget(secondsSpinBox);
+    buttonLayout1->addWidget(secondsSpinBox);
 
     QTimer* timer = new QTimer(this);
-    bool isTimerRunning = false;  // Add a flag to track the timer state
+    bool isTimerRunning = true;  // Add a flag to track the timer state
 
-    connect(timer, &QTimer::timeout, this, [this, timer, timeButton]() {
+    connect(timer, &QTimer::timeout, this, [this, timer, timeButton, &isTimerRunning, hoursSpinBox, minutesSpinBox, secondsSpinBox]() {
         this->countdownTime = this->countdownTime.addSecs(-1);
         qDebug() << "Updated countdown time: " << this->countdownTime.toString("hh : mm : ss");
         QString timeText = this->countdownTime.toString("h : mm : ss");
@@ -201,8 +334,26 @@ MainWindow::MainWindow(QWidget* parent)
         timeButton->setText(timeText);
         if (this->countdownTime == QTime(0, 0)) {
             this->loadImageFromDirectory(m_directory);  // Load a new image from the directory
+            if (scheduleActive) {
+                if (currentScheduleIndex < schedule.size()) {
+                    countdownTime = schedule[currentScheduleIndex++];
+                    // Update the timeButton text immediately after setting the countdownTime
+                    QString timeText = this->countdownTime.toString("h : mm : ss");
+                    if (this->countdownTime.hour() == 0) {
+                        timeText = this->countdownTime.toString("m : ss");
+                    }
+                    timeButton->setText(timeText);
+                }
+                else {
+                    // No more times in the schedule, stop the timer
+                    timer->stop();
+                    isTimerRunning = false;
+                    scheduleActive = false;  // Set scheduleActive to false when the schedule is exhausted
+                }
+            }
         }
         });
+
 
     connect(timeButton, &QPushButton::clicked, this, [this, timer, timeButton]() {
         if (this->isTimerRunning) {
@@ -216,17 +367,37 @@ MainWindow::MainWindow(QWidget* parent)
         this->isTimerRunning = !this->isTimerRunning;
         });
 
-    startTimerButton->setText("Start Timer");
+    startTimerButton->setText("Start");
     connect(startTimerButton, &QPushButton::clicked, this, [this, timer, timeButton, hoursSpinBox, minutesSpinBox, secondsSpinBox]() {
         this->countdownTime.setHMS(hoursSpinBox->value(), minutesSpinBox->value(), secondsSpinBox->value());
         qDebug() << "Countdown time: " << this->countdownTime.toString("hh:mm:ss");
-        timer->start(1000);
-        this->isTimerRunning = true;  // Use this->isTimerRunning instead of isTimerRunning
+
+        // Update the timeButton text immediately after setting the countdownTime
+        QString timeText = this->countdownTime.toString("h : mm : ss");
+        if (this->countdownTime.hour() == 0) {
+            timeText = this->countdownTime.toString("m : ss");
+        }
+        timeButton->setText(timeText);
+
         QPalette palette = timeButton->palette();
         palette.setColor(QPalette::ButtonText, Qt::black);
         timeButton->setPalette(palette);
         });
-    buttonLayout->addWidget(startTimerButton);
+    buttonLayout1->addWidget(startTimerButton);
+
+
+    // Add a button to buttonLayout1 that toggles the visibility of buttonLayout2
+    QPushButton* toggleButton = new QPushButton("Toggle");
+    connect(toggleButton, &QPushButton::clicked, this, [buttonLayout2]() {
+        bool isVisible = buttonLayout2->itemAt(0)->widget()->isVisible(); // Check the visibility of the first widget
+        for (int i = 0; i < buttonLayout2->count(); ++i) {
+            QWidget* widget = buttonLayout2->itemAt(i)->widget();
+            if (widget) {
+                widget->setVisible(!isVisible);
+            }
+        }
+        });
+    buttonLayout1->addWidget(toggleButton);
 
     // Create a QFont object
     QFont font;
@@ -246,6 +417,14 @@ MainWindow::MainWindow(QWidget* parent)
     startTimerButton->setFont(font);
     posterizeButton->setFont(font);
     blurButton->setFont(font);
+    historyButton->setFont(font);
+    medianFilterButton->setFont(font);
+    toggleButton->setFont(font);
+    rotateClockwiseButton->setFont(font);
+    rotateCounterclockwiseButton->setFont(font);
+    startScheduleButton->setFont(font);
+    editScheduleButton->setFont(font);
+	toggleLinesButton->setFont(font);
 
     // Set the font for the timer
     timeButton->setFont(timerFont);
@@ -265,7 +444,7 @@ MainWindow::MainWindow(QWidget* parent)
 
 
     // Set the size policy for the buttons
-    QSizePolicy sizePolicy(QSizePolicy::Minimum, QSizePolicy::Fixed);
+    QSizePolicy sizePolicy(QSizePolicy::Minimum, QSizePolicy::Minimum);
     openButton->setSizePolicy(sizePolicy);
     nextButton->setSizePolicy(sizePolicy);
     flipButton->setSizePolicy(sizePolicy);
@@ -274,6 +453,8 @@ MainWindow::MainWindow(QWidget* parent)
     blurButton->setSizePolicy(sizePolicy);
     startTimerButton->setSizePolicy(sizePolicy);
     timeButton->setSizePolicy(sizePolicy);
+    startScheduleButton->setSizePolicy(sizePolicy);
+    editScheduleButton->setSizePolicy(sizePolicy);
 
     // Set the size policy for the spin boxes
     hoursSpinBox->setSizePolicy(sizePolicy);
@@ -294,20 +475,85 @@ MainWindow::MainWindow(QWidget* parent)
 
     // Restore the size and position of the window
     QSettings settings("YourOrganization", "YourApplication");
+    QStringList scheduleStringList = settings.value("schedule").toStringList();
+    for (const QString& timeString : scheduleStringList) {
+        schedule.append(QTime::fromString(timeString));
+    }
     restoreGeometry(settings.value("mainWindowGeometry").toByteArray());
     m_directory = settings.value("lastDirectory").toString();
 
+    // Load the history from QSettings
+    directoryHistory = settings.value("directoryHistory").toStringList();
+
     if (!m_directory.isEmpty()) {
         setDirectory(m_directory);  // Set the directory
-        QTimer::singleShot(100, this, &MainWindow::onNextButtonClicked);
+        QTimer::singleShot(100, this, [this]() { loadImageFromDirectory(m_directory); });
+    }
+
+
+
+}
+
+void MainWindow::startSchedule() {
+    // Start the schedule of timers here
+    // You could use a QTimer for each item in the schedule, and connect the timeout signal to a slot that starts the next timer
+    scheduleActive = true;
+    if (!schedule.empty()) {
+        currentScheduleIndex = 0;
+        startNextTimerInSchedule();
     }
 }
+
+void MainWindow::startNextTimerInSchedule() {
+    if (currentScheduleIndex < schedule.size()) {
+        countdownTime = schedule[currentScheduleIndex];
+        // Convert the QTime to milliseconds
+        int interval = QTime(0, 0).msecsTo(countdownTime);
+        QTimer* newTimer = new QTimer(this);
+        timers.append(newTimer);  // Add the new timer to the list
+        connect(newTimer, &QTimer::timeout, this, [this, newTimer]() {
+            // Handle the timeout signal here
+            // ...
+            newTimer->deleteLater();  // Delete the timer when it's finished
+        });
+        newTimer->start(interval);  // Start the timer with the calculated interval
+        isTimerRunning = true;
+        currentScheduleIndex++;
+    }
+}
+
+void MainWindow::editSchedule() {
+    ScheduleDialog dialog(this, schedule);  // Pass the schedule to the dialog
+    if (dialog.exec() == QDialog::Accepted) {
+        schedule = dialog.getSchedule();  // Update the schedule when the dialog is accepted
+    }
+}
+
+
+
 
 
 
 void MainWindow::setDirectory(const QString& directory)
 {
     m_directory = directory;
+
+    // Remove the directory if it's already in the history
+    directoryHistory.removeAll(directory);
+
+    // Prepend the directory to the history
+    directoryHistory.prepend(directory);
+
+    // If the history size exceeds 10, remove the last item
+    if (directoryHistory.size() > 10) {
+        directoryHistory.removeLast();
+    }
+
+    // Save the directory and history to QSettings
+    QSettings settings("YourOrganization", "YourApplication");
+    settings.setValue("lastDirectory", m_directory);
+    settings.setValue("directoryHistory", directoryHistory);
+
 
     // Populate the list of files
     m_files.clear();
@@ -391,7 +637,50 @@ void MainWindow::onPosterizeButtonClicked(int levels)
         m_isPosterized = false;
     }
 }
-void MainWindow::onBlurButtonClicked()
+
+
+void MainWindow::onMedianFilterButtonClicked()
+{
+    if (m_originalPixmapItem) {
+        if (!m_isMedianFiltered) {
+            QImage qimg = m_originalPixmapItem->pixmap().toImage().convertToFormat(QImage::Format_RGB888);
+            cv::Mat mat(qimg.height(), qimg.width(), CV_8UC3, (uchar*)qimg.bits(), qimg.bytesPerLine());
+
+            cv::cvtColor(mat, mat, cv::COLOR_RGB2BGR);
+
+            // Define the kernel size based on the image size
+            int kernelSize;
+            if (qimg.width() < 1000 && qimg.height() < 1000) {
+                kernelSize = 1;
+            }
+            else if (qimg.width() < 2000 && qimg.height() < 2000) {
+                kernelSize = 3;
+            }
+            else {
+                kernelSize = 5;
+            }
+
+            cv::medianBlur(mat, mat, kernelSize);  // Apply the median filter
+            cv::cvtColor(mat, mat, cv::COLOR_BGR2RGB);
+
+            QImage result((const unsigned char*)mat.data, mat.cols, mat.rows, mat.step, QImage::Format_RGB888);
+            QPixmap pixmap = QPixmap::fromImage(result);
+
+            m_originalPixmapItem->setPixmap(pixmap);
+
+            m_isMedianFiltered = true;
+        }
+        else {
+            // Revert back to the original image
+            m_originalPixmapItem->setPixmap(m_originalPixmap);
+            m_isMedianFiltered = false;
+        }
+    }
+}
+
+
+
+void MainWindow::onDegradeButtonClicked()
 {
     if (m_view->scene()->items().isEmpty()) {
         qDebug() << "Scene is empty";
@@ -437,7 +726,6 @@ void MainWindow::onBlurButtonClicked()
     }
 }
 
-
 QImage MainWindow::posterizeImage(const QImage& image, int levels)
 {
     QImage reducedImage = image;
@@ -468,24 +756,40 @@ QImage MainWindow::posterizeImage(const QImage& image, int levels)
     return reducedImage;
 }
 
-void MainWindow::onOpenButtonClicked()
-{
+void MainWindow::onOpenButtonClicked() {
     QString directory = QFileDialog::getExistingDirectory();
     if (!directory.isEmpty()) {
-        // Save the selected directory
-        QSettings settings("YourOrganization", "YourApplication");
-        settings.setValue("lastDirectory", directory);
-
+        directoryHistory.append(directory);
         setDirectory(directory);
-        loadImageFromDirectory(directory);  // Load an image from the new directory
+        loadImageFromDirectory(directory);
     }
 }
 
+void MainWindow::onHistoryButtonClicked() {
+    QMenu menu;
+
+    // Add each directory in the history to the menu
+    for (const QString& directory : directoryHistory) {
+        menu.addAction(directory, this, [this, directory]() {
+            // Slot for handling when a directory is clicked in the menu
+            setDirectory(directory);
+            loadImageFromDirectory(directory);
+            });
+    }
+
+    // Show the menu
+    menu.exec(QCursor::pos());
+}
 
 void MainWindow::onNextButtonClicked()
 {
     if (!m_directory.isEmpty()) {
-        loadImageFromDirectory(m_directory);
+        QMessageBox::StandardButton reply;
+        reply = QMessageBox::question(this, "Confirmation", "Are you sure you want to load the next image?",
+            QMessageBox::Yes | QMessageBox::No);
+        if (reply == QMessageBox::Yes) {
+            loadImageFromDirectory(m_directory);
+        }
     }
 }
 
@@ -598,8 +902,17 @@ void MainWindow::loadImageFromDirectory(const QString& directory)
 
     // Apply the Lanczos resampling algorithm
     cv::Mat resampled;
-    cv::resize(img, resampled, cv::Size(img.cols * 1, img.rows * 1), 0, 0, cv::INTER_LANCZOS4);
-    qDebug() << "Applied Lanczos resampling algorithm";
+    // Check the size of the image
+    if (img.cols < 2000 && img.rows < 2000) {
+        // If the image is smaller than 2000x2000, make it twice as big
+        cv::resize(img, resampled, cv::Size(img.cols * 2, img.rows * 2), 0, 0, cv::INTER_LANCZOS4);
+        qDebug() << "Applied Lanczos resampling algorithm and resized image";
+    }
+    else {
+        // If the image is already 2000x2000 or larger, apply Lanczos but keep the same size
+        cv::resize(img, resampled, cv::Size(img.cols, img.rows), 0, 0, cv::INTER_LANCZOS4);
+        qDebug() << "Applied Lanczos resampling algorithm without resizing";
+    }
 
     // Convert the resampled image to RGB
     cv::cvtColor(resampled, resampled, cv::COLOR_BGR2RGB);
@@ -669,13 +982,46 @@ void MainWindow::loadImageFromDirectory(const QString& directory)
 
     // At the end of the loadImageFromDirectory method
     startTimerButton->click();
+
+    m_isBlurred = false;
+
+    m_isMedianFiltered = false;
+
+
+    // Recreate the lines
+    QPen pen(Qt::red, 2); // Set color to red and width to 2
+    m_view->setHorizontalLine(new QGraphicsLineItem(0, m_view->scene()->height() / 2, m_view->scene()->width(), m_view->scene()->height() / 2));
+
+    m_view->horizontalLine()->setPen(pen);
+    m_view->scene()->addItem(m_view->horizontalLine());
+
+    m_view->setVerticalLine(new QGraphicsLineItem(m_view->scene()->width() / 2, 0, m_view->scene()->width() / 2, m_view->scene()->height()));
+
+    m_view->verticalLine()->setPen(pen);
+    m_view->scene()->addItem(m_view->verticalLine());
+
+    // Your existing code to handle the rest of the function...
 }
+
+
 
 void MainWindow::closeEvent(QCloseEvent* event)
 {
-    // Save the size and position of the window
+    // Convert the schedule to a QStringList
+    QStringList scheduleStringList;
+    for (const QTime& time : schedule) {
+        scheduleStringList.append(time.toString());
+    }
+
+    // Save the schedule to QSettings
     QSettings settings("YourOrganization", "YourApplication");
+    settings.setValue("schedule", scheduleStringList);
+
+    // Save the size and position of the window
     settings.setValue("mainWindowGeometry", saveGeometry());
+
+    // Save the history to QSettings
+    settings.setValue("directoryHistory", directoryHistory);
 
     QWidget::closeEvent(event);
 }
