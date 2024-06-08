@@ -32,6 +32,8 @@
 #include <QListWidget>
 
 #include <QSettings>  // Add this line
+#include <QApplication>
+#include <QClipboard> 
 
 class SelectAllSpinBox : public QSpinBox
 {
@@ -302,6 +304,15 @@ MainWindow::MainWindow(QWidget* parent)
         infoBox.exec();
         });
 
+    QPushButton* copyButton = new QPushButton("Copy");
+    buttonLayout2->addWidget(copyButton);
+    connect(copyButton, &QPushButton::clicked, this, [this]() {
+        if (m_originalPixmapItem) {
+            QClipboard* clipboard = QApplication::clipboard();
+            clipboard->setPixmap(m_originalPixmapItem->pixmap());
+        }
+        });
+
     // Add both QHBoxLayouts to the main QVBoxLayout
     QVBoxLayout* layout = new QVBoxLayout;
     layout->setContentsMargins(0, 0, 0, 0);
@@ -435,6 +446,7 @@ MainWindow::MainWindow(QWidget* parent)
     editScheduleButton->setFont(font);
 	toggleLinesButton->setFont(font);
 	infoButton->setFont(font);
+	copyButton->setFont(font);
 
     // Set the font for the timer
     timeButton->setFont(timerFont);
@@ -855,7 +867,15 @@ void MainWindow::loadImageFromDirectory(const QString& directory)
     magickWand = NewMagickWand();
     qDebug() << "Initialized MagickWand";
 
-    if (MagickReadImage(magickWand, imagePath.toLocal8Bit().constData()) == MagickFalse) {
+    QFile file(imagePath);
+    if (!file.open(QIODevice::ReadOnly)) {
+        qDebug() << "Failed to open file";
+        return;
+    }
+    QByteArray imageData = file.readAll();
+    file.close();
+
+    if (MagickReadImageBlob(magickWand, imageData.constData(), imageData.size()) == MagickFalse) {
         qDebug() << "Failed to read image";
         QMessageBox::critical(this, tr("Image Load Error"), tr("Failed to load image: ") + imagePath);
         DestroyMagickWand(magickWand);
@@ -883,7 +903,7 @@ void MainWindow::loadImageFromDirectory(const QString& directory)
         qDebug() << "Created LittleCMS transform";
 
         // Open the image
-        img = cv::imread(imagePath.toStdString());
+        img = cv::imread(imagePath.toLocal8Bit().constData(), cv::IMREAD_COLOR);
         if (img.empty()) {
             qDebug() << "Failed to open image";
             return;
@@ -902,7 +922,7 @@ void MainWindow::loadImageFromDirectory(const QString& directory)
     }
     else {
         qDebug() << "Color profile does not exist";
-        img = cv::imread(imagePath.toStdString(), cv::IMREAD_COLOR);
+        img = cv::imread(imagePath.toLocal8Bit().constData(), cv::IMREAD_COLOR);
         if (img.empty()) {
             qDebug() << "Failed to open image";
             return;
