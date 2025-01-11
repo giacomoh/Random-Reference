@@ -2,162 +2,158 @@
 #define MAINWINDOW_H
 
 #include <QWidget>
+#include <QTime>
+#include <QTimer>
+#include <QFileInfoList>
+#include <QList>
+#include <QCloseEvent>
+#include <QMap>
+#include <QDateTime>
+#include <QSettings>
+#include <QGraphicsPixmapItem>
+#include <QKeyEvent>
+#include <QCheckBox>
 #include <QPushButton>
-#include <QVBoxLayout>
-#include <QFileDialog>
-#include <QGraphicsView>
-#include <QTimeEdit>  // Add this line
-#include <QSettings>  // Add this line
+#include <qguiapplication.h>
 
-class ZoomableGraphicsView;  // Forward declaration
+class ZoomableGraphicsView;  // forward declaration
+class ScheduleDialog;
 
 class MainWindow : public QWidget
 {
     Q_OBJECT
-
 public:
     explicit MainWindow(QWidget* parent = nullptr);
-    void startSchedule();
-    void startNextTimerInSchedule();
-    void editSchedule();
-    QString getRandomImage(const QString& directory);
-    int levels;  // Add this line
-    QImage posterizeImage(const QImage& image, int levels);
-    bool m_isBlurred = false;
-    bool scheduleActive;  // Declare the scheduleActive member variable
-    QGraphicsLineItem* m_horizontalLine;
-    QGraphicsLineItem* m_verticalLine;
-    void updateLines();
+    ~MainWindow();   // destructor
+
+    // Enum for actions
+    enum class Action {
+        OpenDirectory,
+        History,
+        NextImage,
+        Flip,
+        Grayscale,
+        StartSchedule,
+        EditSchedule,
+        RotateClockwise,
+        RotateCounterclockwise,
+        Posterize,
+        Blur,
+        MedianFilter,
+        ToggleLines,
+        SaveRuler,
+        CopyDisplayedImage,
+        ProcessClipboard,
+        ConfirmDelete,
+        // etc.
+    };
+
+    //settings
+    QMap<QString, QString> m_hotkeyMappings;
+    QMap<Action, QString> m_actionNameMap;
+    QString m_customJSXPath;
+
+protected:
+    void closeEvent(QCloseEvent* event) override;
+    void keyPressEvent(QKeyEvent* event) override;
+
+    void performAction(Action action);
+
+    void onSettingsButtonClicked();
+
+    void refreshCustomJSXPath();
 
 private slots:
+    // UI-related slots
     void onOpenButtonClicked();
     void onHistoryButtonClicked();
     void onNextButtonClicked();
     void onFlipButtonClicked();
-    void onGrayscaleButtonClicked();  // Declare the onGrayscaleButtonClicked function
+    void onGrayscaleButtonClicked();
     void onPosterizeButtonClicked(int levels);
     void onDegradeButtonClicked();
     void onMedianFilterButtonClicked();
-
+    void confirmAndMoveFileToDeleteFolder();
+    void startSchedule();
+    void editSchedule();
 
 private:
-    ZoomableGraphicsView* m_view;  // Declare the m_view member variable
-    QGraphicsPixmapItem* m_originalPixmapItem;  // Declare the m_originalPixmapItem member variable
-    QGraphicsPixmapItem* m_grayscalePixmapItem;  // Declare the m_grayscalePixmapItem member variable
-    bool m_isGrayscale;  // Declare the m_isGrayscale member variable
-    QFileInfoList m_files;  // Add this line
-    int m_currentIndex = 0;  // Add this line
-    void setDirectory(const QString& directory);  // Add this line
-    QTime countdownTime;
-    bool isTimerRunning;
-    QTimer* timer;
-    QPixmap m_originalPixmap;  // Store the original pixmap
-    QPixmap m_grayscalePixmap;  // Store the grayscale pixmap
-    bool m_isPosterized;  // Add this line
-    QPushButton* startTimerButton;  // Add this line
+    // Internal helper methods
+    void setDirectory(const QString& directory);
+    void loadImageFromDirectory(const QString& directory);
+    QString getRandomImage(const QString& directory);
+    void processAndDisplayImage(const QString& filePath);
+    void processClipboardImage();
+    void processImage(const QImage& image);
+    void saveImageToSharedFolder(const QImage& image, const QString& suffix);
+    void deleteOldestFolderIfNeeded();
+    QString m_tempDisplayedFilePath;
+    // Scheduling
+    void startNextTimerInSchedule();
+
+    // UI members
+    ZoomableGraphicsView* m_view;
+    QGraphicsPixmapItem* m_originalPixmapItem;
+    QGraphicsPixmapItem* m_grayscalePixmapItem;
+    QPushButton* startTimerButton;
+
+    // Pixmaps
+    QPixmap m_originalPixmap;
+    QPixmap m_grayscalePixmap;
+    QString m_tempRulerFilePath;
+    QString m_tempOriginalFilePath;
+    QString m_tempGrayscaleFilePath;
+
+    // Directory & file handling
+    QString m_directory;
+    QFileInfoList m_files;
+    int m_currentIndex = 0;
     QStringList directoryHistory;
-    bool m_isMedianFiltered;  // Add this line
+    QString m_currentImagePath;
+
+    // Timers
+    bool scheduleActive;
+    QTime countdownTime;
     QList<QTime> schedule;
     int currentScheduleIndex;
-
-
-private:
-    void loadImageFromDirectory(const QString& directory);
     QList<QTimer*> timers;
-    QSettings settings;
+    QTimer* m_countdownTimer;
+    bool isTimerRunning;
 
-private:
-    QString m_directory;
+    QPushButton* m_timeButton;
+    QTime m_defaultCountdownTime;
 
-protected:
-    void closeEvent(QCloseEvent* event) override;
-};
+    // Image states
+    bool m_isGrayscale;
+    bool m_isPosterized;
+    bool m_isBlurred;
+    bool m_isMedianFiltered;
 
+    // Folder housekeeping
+    QMap<QString, QDateTime> m_folderCreationTimes;
+    QString m_tempFilePath;
 
-#include <QDialog>
-#include <QListWidget>
-#include <QPushButton>
-#include <QVBoxLayout>
-#include <QTime>
+    // Settings
+    QSettings settings;  // used to store/restore QSettings
 
-class ScheduleDialog : public QDialog {
-    Q_OBJECT
+    // New member variable
+    bool m_copyPasteEnabled;
 
-public:
-    ScheduleDialog(QWidget* parent = nullptr, const QList<QTime>& schedule = QList<QTime>())
-        : QDialog(parent), schedule(schedule) {
-        QVBoxLayout* layout = new QVBoxLayout(this);
+    // Map each Action to a key code (Qt::Key_*)
+    QMap<Action, int> m_actionKeyMap;
 
-        // Create a QTimeEdit for time input
-        QTimeEdit* timeEdit = new QTimeEdit(this);
-        timeEdit->setDisplayFormat("hh:mm:ss");
-        layout->addWidget(timeEdit);
+    // Reverse lookup: key code => Action
+    QMap<int, Action> m_keyActionMap;
 
-        // Create a QListWidget to display the schedule
-        listWidget = new QListWidget(this);  // Initialize the listWidget member variable
-        layout->addWidget(listWidget);
+    // We'll store key->action. e.g. Qt::Key_F1 -> Action::ProcessClipboard
+    QMap<int, Action> m_defaultKeyMap;
 
-        // Initialize the QListWidget with the schedule
-        for (const QTime& time : schedule) {
-            listWidget->addItem(time.toString("hh:mm:ss"));
-        }
+    // Also, some actions might open dynamic URLs. We'll keep a map of Action -> URL
+    // for the ones that are just open-URL type:
+    QMap<Action, QString> m_actionUrlMap;
 
-        // Create an "Add" button
-        QPushButton* addButton = new QPushButton("Add", this);
-        connect(addButton, &QPushButton::clicked, this, [=]() {
-            QTime time = timeEdit->time();
-            this->schedule.append(time);
-            listWidget->addItem(time.toString("hh:mm:ss"));
-            });
-
-        layout->addWidget(addButton);
-
-        QPushButton* removeButton = new QPushButton("Remove Timer", this);
-        connect(removeButton, &QPushButton::clicked, this, &ScheduleDialog::removeTimer);
-        layout->addWidget(removeButton);
-
-        QPushButton* okButton = new QPushButton("OK", this);
-        connect(okButton, &QPushButton::clicked, this, &QDialog::accept);
-        layout->addWidget(okButton);
-
-        setLayout(layout);
-    }
-
-    QList<QTime> getSchedule() const {
-        QList<QTime> schedule;
-        for (int i = 0; i < listWidget->count(); ++i) {
-            schedule.append(QTime::fromString(listWidget->item(i)->text(), "hh:mm:ss"));
-        }
-        return schedule;
-    }
-
-private slots:
-    void addTimer(QTime time) {
-        // Add a new timer to the list widget
-        listWidget->addItem(time.toString("hh:mm:ss"));
-
-        // Log the addition of the timer
-        qInfo() << "Added timer: " << QTime(0, 10).toString("hh:mm:ss");
-        qInfo() << "Current schedule: " << getSchedule();
-    }
-
-    void removeTimer() {
-        if (listWidget->currentRow() != -1) {
-            // Remove the currently selected timer from the list widget
-            QListWidgetItem* item = listWidget->takeItem(listWidget->currentRow());
-            QString itemText = item->text();
-            delete item;
-
-            // Log the removal of the timer
-            qInfo() << "Removed timer: " << itemText;
-            qInfo() << "Current schedule: " << getSchedule();
-        }
-    }
-
-private:
-    QListWidget* listWidget;
-    QList<QTime> schedule;
-    QList<QTimer*> timers;
+    // New method to apply posterization
+    void applyPosterization(int levels);
 };
 
 #endif // MAINWINDOW_H
