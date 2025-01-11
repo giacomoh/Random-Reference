@@ -21,6 +21,10 @@ You can add multiple filters to each other, and even copy the image the way that
 click on the edit schedule button to create a set of timers that will run one after the other.
 start the schedule with the first button in the second row (start schedule).
 
+The application will stay always on top, will remember the last folder opened, and it will give a history of all the most recently opened folders:
+![image](https://github.com/user-attachments/assets/c03a22d7-33ac-401e-93c8-5faf6e3fcdac)
+
+
 IMPORTANT!
 the application will also create a JSX file if you click on export ruler to photoshop:
 
