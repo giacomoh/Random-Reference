@@ -16,6 +16,7 @@ The posterization and grayscale are optimised to account for human perception.
 You can add multiple filters to each other, and even copy the image the way that it looks in the application.
 
 ![image](https://github.com/user-attachments/assets/d9df18c5-a794-4050-89ff-5776bb0c23e2)
+
 click on the edit schedule button to create a set of timers that will run one after the other.
 start the schedule with the first button in the second row (start schedule).
 
