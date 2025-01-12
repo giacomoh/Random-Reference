@@ -1,6 +1,4 @@
-WINDOWS ONLY!
-
-Get the releases here: https://github.com/giacomoh/Random-Reference/tags
+Download the releases here: https://github.com/giacomoh/Random-Reference/tags
 
 # Screenshots
 ![image](https://github.com/user-attachments/assets/81bfb924-b734-4916-b774-5ed8064786bb)
