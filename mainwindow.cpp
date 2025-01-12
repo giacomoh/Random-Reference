@@ -1,4 +1,4 @@
-﻿#include "mainwindow.h"
+#include "mainwindow.h"
 #include "zoomablegraphicsview.h"
 #include "imageutils.h"    // For image processing utilities
 
@@ -385,16 +385,15 @@ MainWindow::MainWindow(QWidget* parent)
     QPushButton* copyDisplayedButton = new QPushButton("📋🖼️");
     buttonLayout2->addWidget(copyDisplayedButton);
     connect(copyDisplayedButton, &QPushButton::clicked, this, [this]() {
-        // 1) Decide which pixmap is currently shown
+        // 1) Decide which pixmap is currently shown.
         //    If you do grayscale by showing/hiding m_grayscalePixmapItem, check isVisible().
         QPixmap displayedPixmap;
-
         if (m_grayscalePixmapItem && m_grayscalePixmapItem->isVisible()) {
-            // The grayscale item is visible
+            // The grayscale item is visible.
             displayedPixmap = m_grayscalePixmapItem->pixmap();
         }
         else if (m_originalPixmapItem) {
-            // “Original” item (which might be blurred, median, or posterized in your code)
+            // The "Original" item (which might be blurred, median, or posterized in your code).
             displayedPixmap = m_originalPixmapItem->pixmap();
         }
         else {
@@ -402,31 +401,32 @@ MainWindow::MainWindow(QWidget* parent)
             return;
         }
 
-        // 2) Remove any old temp file
+        // 2) Remove any old temp file.
         if (!m_tempDisplayedFilePath.isEmpty()) {
             QFile::remove(m_tempDisplayedFilePath);
             m_tempDisplayedFilePath.clear();
         }
 
-        // 3) Construct a path in the user’s temp folder
-        QString folderPath = "C:/Users/Giacomo/AppData/Local/Temp/displayed_image";
+        // 3) Construct a path in the system temporary directory.
+        QString folderPath = QDir::tempPath() + "/displayed_image";  // Portable temp folder
         QDir().mkpath(folderPath);
         m_tempDisplayedFilePath = folderPath + "/current_image.png";
 
-        // 4) Save the displayed image to this path
+        // 4) Save the displayed image to this path.
         bool ok = displayedPixmap.save(m_tempDisplayedFilePath);
         if (!ok) {
             QMessageBox::warning(this, "Error", "Failed to save the displayed image.");
             return;
         }
 
-        // 5) Copy the same pixmap to the system clipboard, if you want actual “paste” capability
+        // 5) Copy the same pixmap to the system clipboard for paste capability.
         QClipboard* clipboard = QApplication::clipboard();
         clipboard->setPixmap(displayedPixmap);
 
         qDebug() << "Saved displayed image to" << m_tempDisplayedFilePath
             << "and copied to clipboard.";
         });
+
 
     // Add both button rows to the main layout
     mainLayout->addLayout(buttonLayout1);
