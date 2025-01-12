@@ -29,9 +29,8 @@ the application will also create a JSX file if you click on export ruler to phot
 
 ![image](https://github.com/user-attachments/assets/ba52194d-71ac-450b-b5e0-2609b50771b9)
 
-it will create a script that when you click this button:
-![image](https://github.com/user-attachments/assets/b85b7b42-332c-483b-980e-e20c3f92d0ee)
- this will create a new group in the CURRENT photoshop file open:
+it will create a script that when this button is clicked (
+![image](https://github.com/user-attachments/assets/b85b7b42-332c-483b-980e-e20c3f92d0ee) ) it will create a new group in the CURRENT photoshop file open:
 
 ![image](https://github.com/user-attachments/assets/d7705df0-ce76-4638-8a55-c1d03e2369aa)
 ![image](https://github.com/user-attachments/assets/3fbf7077-ec28-4d45-9684-7aa792696267)
