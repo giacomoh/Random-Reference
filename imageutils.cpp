@@ -20,54 +20,97 @@ namespace ImageUtils {
 
     cv::Mat loadAndApplyColorProfile(const QString& filePath)
     {
-        // Prepare Magick
+        // Normalize file path and log it
+        QString nativePath = QDir::toNativeSeparators(filePath).trimmed();
+        qDebug() << "[loadAndApplyColorProfile] Native file path:" << nativePath;
+
+        // Check file existence
+        if (!QFile::exists(nativePath)) {
+            qWarning() << "[loadAndApplyColorProfile] File does not exist:" << nativePath;
+            return cv::Mat();
+        }
+
+        // Initialize MagickWand
         MagickWandGenesis();
         MagickWand* wand = NewMagickWand();
 
-        // Load file
-        QFile file(filePath);
+        // Open the file using QFile
+        QFile file(nativePath);
         if (!file.open(QIODevice::ReadOnly)) {
-            qWarning() << "Cannot open file:" << filePath;
-            return cv::Mat();
-        }
-        QByteArray data = file.readAll();
-        file.close();
-
-        if (MagickReadImageBlob(wand, data.constData(), data.size()) == MagickFalse) {
-            qWarning() << "Failed to read image via Magick.";
+            qWarning() << "[loadAndApplyColorProfile] Cannot open file:" << nativePath;
             DestroyMagickWand(wand);
             MagickWandTerminus();
             return cv::Mat();
         }
+        QByteArray data = file.readAll();
+        file.close();
+        qDebug() << "[loadAndApplyColorProfile] File size (bytes):" << data.size();
 
-        // Attempt to retrieve the color profile
-        size_t length;
+        // Attempt to read the image via MagickWand
+        MagickBooleanType result = MagickReadImageBlob(wand, data.constData(), data.size());
+        if (result == MagickFalse) {
+            // Get the error description from MagickWand
+            char* desc = nullptr;
+            ExceptionType severity;
+            desc = MagickGetException(wand, &severity);
+            qWarning() << "[loadAndApplyColorProfile] Failed to read image via Magick. Exception:" << desc;
+            if (desc)
+                MagickRelinquishMemory(desc);
+
+            DestroyMagickWand(wand);
+            MagickWandTerminus();
+            return cv::Mat();
+        }
+        qDebug() << "[loadAndApplyColorProfile] Image read via Magick successfully.";
+
+        // Retrieve ICC profile if present
+        size_t length = 0;
         unsigned char* profile = MagickGetImageProfile(wand, "ICC", &length);
-        cv::Mat img;
+        if (profile)
+            qDebug() << "[loadAndApplyColorProfile] ICC profile found, length:" << length;
+        else
+            qDebug() << "[loadAndApplyColorProfile] No ICC profile found.";
 
+        // Get image blob in PNG format (or another format supported by OpenCV)
+        size_t blobLength = 0;
+        unsigned char* blob = MagickGetImageBlob(wand, &blobLength);
+        if (!blob || blobLength == 0) {
+            qWarning() << "[loadAndApplyColorProfile] Failed to get image blob from MagickWand.";
+            DestroyMagickWand(wand);
+            MagickWandTerminus();
+            return cv::Mat();
+        }
+        qDebug() << "[loadAndApplyColorProfile] Image blob retrieved, length:" << blobLength;
+
+        // Decode the image blob using OpenCV
+        cv::Mat bufMat(1, blobLength, CV_8UC1, blob);
+        cv::Mat img = cv::imdecode(bufMat, cv::IMREAD_COLOR);
+        if (img.empty()) {
+            qWarning() << "[loadAndApplyColorProfile] Failed to decode image blob with OpenCV.";
+            MagickRelinquishMemory(blob);
+            DestroyMagickWand(wand);
+            MagickWandTerminus();
+            return cv::Mat();
+        }
+        qDebug() << "[loadAndApplyColorProfile] Image decoded successfully, size:" << img.cols << "x" << img.rows;
+
+        // If an ICC profile exists, apply the color transformation using LittleCMS
         if (profile) {
-            qDebug() << "Color profile found.";
+            qDebug() << "[loadAndApplyColorProfile] Applying color profile transformation.";
             cmsHPROFILE inProfile = cmsOpenProfileFromMem(profile, length);
             cmsHPROFILE outProfile = cmsCreate_sRGBProfile();
             cmsHTRANSFORM transform = cmsCreateTransform(inProfile, TYPE_BGR_8, outProfile, TYPE_BGR_8, INTENT_PERCEPTUAL, 0);
-
-            // read with OpenCV
-            img = cv::imread(filePath.toStdString(), cv::IMREAD_COLOR);
-            if (!img.empty()) {
-                // Apply transform in place
-                cmsDoTransform(transform, img.data, img.data, img.total());
-            }
+            cmsDoTransform(transform, img.data, img.data, img.total());
             cmsDeleteTransform(transform);
             cmsCloseProfile(inProfile);
             cmsCloseProfile(outProfile);
         }
-        else {
-            qDebug() << "No color profile found.";
-            img = cv::imread(filePath.toStdString(), cv::IMREAD_COLOR);
-        }
 
+        // Clean up MagickWand resources
+        MagickRelinquishMemory(blob);
         DestroyMagickWand(wand);
         MagickWandTerminus();
+
         return img;
     }
 
@@ -151,7 +194,7 @@ namespace ImageUtils {
         cv::Mat L_float;
         channels[0].convertTo(L_float, CV_32F);
 
-        // Define quantization interval based on OpenCV’s Lab scaling (0-255)
+        // Define quantization interval based on OpenCVâ€™s Lab scaling (0-255)
         double interval = 255.0 / levels;
 
         // Build a lookup table for the quantized L* value:
